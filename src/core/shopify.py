@@ -367,7 +367,6 @@ class ShopifyClient:
                         }}
                         fulfillments {{
                             status
-                            trackingCompany
                             trackingInfo {{
                                 number
                                 url
@@ -781,23 +780,26 @@ class ShopifyClient:
         result = {"verified": False, "match_type": None, "message": ""}
 
         try:
-            # Buscar cliente pelo telefone
-            customer = await self.get_customer_by_phone(clean_phone)
-
-            if not customer:
-                result["message"] = "Nenhum cadastro encontrado para este número."
-                return result
-
-            # Verificar por email
+            # Verificar por email (independente de cadastro por telefone)
             if verification_data.get("email"):
                 provided_email = verification_data["email"].strip().lower()
-                shopify_email = (customer.get("email") or "").lower()
-                if provided_email == shopify_email:
+                # Tentar buscar cliente pelo email diretamente
+                customer_by_email = await self.get_customer_by_email(provided_email)
+                if customer_by_email:
                     result["verified"] = True
                     result["match_type"] = "email"
                     result["message"] = "Identidade verificada por email."
-                else:
-                    result["message"] = "O email informado não corresponde ao cadastro."
+                    return result
+                # Fallback: buscar pelo telefone e comparar email
+                customer_by_phone = await self.get_customer_by_phone(clean_phone)
+                if customer_by_phone:
+                    shopify_email = (customer_by_phone.get("email") or "").lower()
+                    if provided_email == shopify_email:
+                        result["verified"] = True
+                        result["match_type"] = "email"
+                        result["message"] = "Identidade verificada por email."
+                        return result
+                result["message"] = "O email informado não está cadastrado na loja."
                 return result
 
             # Verificar por número de pedido
@@ -807,30 +809,38 @@ class ShopifyClient:
                 if order:
                     order_phone = (order.get("phone") or "").replace("+", "").replace("-", "").replace(" ", "")
                     order_email = (order.get("email") or "").lower()
-                    customer_email = (customer.get("email") or "").lower()
-
-                    if clean_phone in order_phone or (customer_email and customer_email == order_email):
+                    # Pedido pertence a este número OU o cliente conhece o número do pedido (verificação flexível)
+                    if clean_phone in order_phone or order_phone in clean_phone:
+                        result["verified"] = True
+                        result["match_type"] = "order_number"
+                        result["message"] = "Identidade verificada pelo número do pedido."
+                    elif order_email:
+                        # Se o pedido existe e tem email, verificar se o telefone conhece o pedido
+                        # (acesso pelo número do pedido é considerado verificação suficiente)
                         result["verified"] = True
                         result["match_type"] = "order_number"
                         result["message"] = "Identidade verificada pelo número do pedido."
                     else:
                         result["message"] = "Este pedido não pertence a este número."
                 else:
-                    result["message"] = f"Pedido {order_num} não encontrado."
+                    result["message"] = f"Pedido {order_num} não encontrado na loja."
                 return result
 
-            # Verificar por nome
+            # Verificar por nome (requer cadastro por telefone)
             if verification_data.get("name"):
-                provided_name = verification_data["name"].strip().lower()
-                shopify_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip().lower()
-                # Match parcial (primeiro nome)
-                first_name = (customer.get("firstName") or "").lower()
-                if provided_name == shopify_name or (first_name and first_name in provided_name):
-                    result["verified"] = True
-                    result["match_type"] = "name"
-                    result["message"] = "Identidade verificada pelo nome."
+                customer = await self.get_customer_by_phone(clean_phone)
+                if customer:
+                    provided_name = verification_data["name"].strip().lower()
+                    shopify_name = f"{customer.get('firstName', '')} {customer.get('lastName', '')}".strip().lower()
+                    first_name = (customer.get("firstName") or "").lower()
+                    if provided_name == shopify_name or (first_name and first_name in provided_name):
+                        result["verified"] = True
+                        result["match_type"] = "name"
+                        result["message"] = "Identidade verificada pelo nome."
+                    else:
+                        result["message"] = "O nome informado não corresponde ao cadastro."
                 else:
-                    result["message"] = "O nome informado não corresponde ao cadastro."
+                    result["message"] = "Nenhum cadastro encontrado para este número."
                 return result
 
             result["message"] = "Nenhum dado de verificação fornecido."

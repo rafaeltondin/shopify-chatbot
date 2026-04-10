@@ -55,6 +55,25 @@ _verified_customers: Dict[str, float] = {}  # jid → timestamp da verificação
 CONTEXT_CACHE_TTL = 600  # 10 minutos
 VERIFICATION_TTL = 1800  # 30 minutos — após verificar, não pede de novo por 30min
 
+# Regex para detectar email e número de pedido nas mensagens
+_EMAIL_RE = re.compile(r'[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}')
+_ORDER_RE = re.compile(r'#?\s*(\d{3,6})\b')  # #1001 ou 1001
+
+
+def _extract_verification_data(text: str) -> dict:
+    """Extrai email e/ou número de pedido de uma mensagem de texto."""
+    data = {}
+    email_match = _EMAIL_RE.search(text)
+    if email_match:
+        data['email'] = email_match.group(0)
+    order_match = _ORDER_RE.search(text)
+    if order_match:
+        num = order_match.group(1)
+        # Ignorar anos (4 dígitos acima de 2000) e números muito curtos
+        if 100 <= int(num) <= 99999:
+            data['order_number'] = f'#{num}'
+    return data
+
 
 async def _redis_get(key: str) -> Optional[str]:
     """Busca valor no Redis. Retorna None se ausente ou Redis indisponível."""
@@ -471,6 +490,23 @@ async def _process_message(phone_number: str, message_text: str, instance_id: st
         enriched_messages = [
             {"role": "system", "content": customer_context},
         ] + prospect.history
+
+        # ── INTERCEPTAÇÃO DE VERIFICAÇÃO DE IDENTIDADE ──────────────────────────
+        # Se o cliente não está verificado E a mensagem contém email ou número de pedido,
+        # não chamar o LLM — processar verify_identity diretamente.
+        if not _is_customer_verified(phone_number):
+            last_user_msg = ""
+            for msg in reversed(prospect.history):
+                if msg.get("role") == "user":
+                    last_user_msg = msg.get("content", "")
+                    break
+            verif_data = _extract_verification_data(last_user_msg)
+            if verif_data:
+                logger.info(f"[{phone_number}] INTERCEPTAÇÃO: dados de verificação detectados na mensagem, chamando verify_identity diretamente. Dados: {verif_data}")
+                fake_action = {"action": "verify_identity", "arguments": verif_data}
+                await _handle_verify_identity(fake_action, prospect)
+                return
+        # ── FIM DA INTERCEPTAÇÃO ─────────────────────────────────────────────
 
         logger.info(f"[{phone_number}] Chamando LLM com {len(prospect.history)} msgs + contexto Shopify")
 
