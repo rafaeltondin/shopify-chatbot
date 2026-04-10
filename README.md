@@ -1,17 +1,30 @@
 # Shopify WhatsApp Chatbot
 
-Chatbot de atendimento ao cliente via WhatsApp com integração nativa ao Shopify, utilizando IA via OpenRouter e Evolution API para envio/recebimento de mensagens.
+Chatbot de atendimento ao cliente via WhatsApp com integracao nativa ao Shopify.
 
 ## Funcionalidades
 
-- Atendimento automático via WhatsApp com IA configurável
-- Integração com Shopify (pedidos, produtos, estoque)
+### Atendimento ao Cliente
+- Respostas automaticas via WhatsApp com IA configuravel
+- Consulta de **status de pedidos** em tempo real
+- Exibicao de **codigo de rastreio** com link direto da transportadora
+- Listagem do **historico de compras** do cliente
+- Busca de produtos, estoque e recomendacoes personalizadas
+- Geracao de links de checkout direto
+
+### Vendas e Automacao
+- Funil de vendas com multiplos estagios configuraveis
+- Sistema de follow-up automatico
+- Recuperacao de carrinho abandonado
+- Deteccao semantica de intencoes do cliente
+- Tags e automacoes baseadas em comportamento
+
+### Operacional
+- Agendamento e confirmacao de consultas/pedidos
+- Notificacoes por e-mail (templates HTML)
 - Dashboard web de gerenciamento
-- Agendamento e confirmação de consultas/pedidos
-- Sistema de follow-up e recuperação de carrinho
-- Notificações por e-mail (templates HTML)
-- Multi-instância (uma instalação por loja)
-- Autenticação JWT com painel administrativo
+- Multi-instancia (uma instalacao por loja)
+- Autenticacao JWT com painel administrativo
 
 ## Stack
 
@@ -22,29 +35,49 @@ Chatbot de atendimento ao cliente via WhatsApp com integração nativa ao Shopif
 | Cache / Filas | Redis 7 |
 | IA / LLM | OpenRouter (GLM, GPT, Claude, etc.) |
 | WhatsApp | Evolution API v2 |
-| Shopify | REST API 2025-01 |
+| Shopify | Admin API 2025-01 (GraphQL + REST) |
 | Deploy | Docker Compose |
 
-## Pré-requisitos
+## Consulta de Pedidos e Rastreio
+
+O agente de IA tem acesso nativo aos dados de pedidos da Shopify. Os clientes podem perguntar via WhatsApp:
+
+| O cliente diz... | O agente faz... |
+|-----------------|-----------------|
+| "onde esta meu pedido?" | Busca status por telefone ou numero do pedido |
+| "codigo de rastreio do #1001" | Retorna codigo + link direto da transportadora |
+| "quais meus pedidos recentes?" | Lista historico com status de pagamento e envio |
+| "meu pedido foi entregue?" | Consulta status de fulfillment em tempo real |
+
+### Transportadoras Suportadas (link automatico)
+- Correios (codigo no formato )
+- JadLog
+- Total Express
+- Loggi
+- Melhor Envio
+
+### Seguranca
+Antes de exibir dados de pedidos, o sistema exige verificacao de identidade (e-mail cadastrado ou numero do pedido). A verificacao fica em cache por 30 minutos.
+
+## Pre-requisitos
 
 - Docker e Docker Compose instalados
 - Conta no [OpenRouter](https://openrouter.ai)
 - [Evolution API](https://github.com/EvolutionAPI/evolution-api) rodando e configurada
 - Loja Shopify com token de acesso privado
-- Domínio com proxy reverso (ex: OpenLiteSpeed / Nginx)
+- Dominio com proxy reverso (ex: OpenLiteSpeed / Nginx)
 
-## Instalação
+## Instalacao
 
 ```bash
-# 1. Clone o repositório
+# 1. Clone o repositorio
 git clone https://github.com/rafaeltondin/shopify-chatbot.git
 cd shopify-chatbot
 
-# 2. Configure as variáveis de ambiente
+# 2. Configure as variaveis de ambiente
 cp .env.example .env
-# Edite .env com suas credenciais
 
-# 3. Adicione as variáveis de banco ao .env
+# 3. Adicione as variaveis de banco ao .env
 echo "DB_ROOT_PASSWORD=sua-senha-root" >> .env
 echo "DB_USER=mysql" >> .env
 echo "DB_PASSWORD=sua-senha-db" >> .env
@@ -52,25 +85,26 @@ echo "HOST_PORT=8520" >> .env
 
 # 4. Suba os containers
 docker compose up -d --build
-
-# 5. Verifique os logs
-docker compose logs -f app
 ```
 
-## Configuração
+## Configuracao
 
-Copie `.env.example` para `.env` e preencha:
+Copie  para  e preencha:
 
-| Variável | Descrição |
+| Variavel | Descricao |
 |----------|-----------|
-| `INSTANCE_ID` | Identificador único da instância (ex: `minhaloja`) |
-| `SITE_URL` | URL pública do chatbot |
-| `LOGIN_USER` / `LOGIN_PASSWORD` | Credenciais do painel web |
-| `SECRET_KEY` | Chave secreta JWT (gere com `openssl rand -hex 32`) |
-| `SHOPIFY_STORE_URL` | Domínio `.myshopify.com` da loja |
-| `SHOPIFY_ACCESS_TOKEN` | Token de acesso privado Shopify |
-| `OPENROUTER_API_KEY` | Chave da API OpenRouter |
-| `LLM_MODEL_PREFERENCE` | Modelo de IA (ex: `openai/gpt-4o-mini`) |
+|  | Identificador unico da instancia |
+|  | URL publica do chatbot |
+|  /  | Credenciais do painel web |
+|  | Chave secreta JWT (08b99e7fb4ddbd303d1c1cbb9bf2789b5155eaf05881b07531a49b101d0b4faa) |
+|  | Dominio  da loja |
+|  | Token de acesso privado Shopify |
+|  | Chave da API OpenRouter |
+|  | Modelo de IA (ex: ) |
+|  | Senha root do MySQL |
+|  | Usuario do banco |
+|  | Senha do banco |
+|  | Porta exposta pelo container (ex: ) |
 
 ## Estrutura do Projeto
 
@@ -81,33 +115,26 @@ shopify-chatbot/
 ├── docker-compose.yml
 ├── requirements.txt
 ├── .env.example
-├── llm_config.yaml          # Configurações do LLM
+├── llm_config.yaml
 ├── src/
-│   ├── api/                 # Endpoints REST
-│   ├── core/                # Lógica principal
-│   │   ├── config.py        # Settings (Pydantic)
-│   │   ├── llm.py           # Integração OpenRouter
-│   │   ├── shopify.py       # Integração Shopify
-│   │   ├── evolution.py     # Integração Evolution API
+│   ├── api/routes/          # Auth, pedidos, produtos, agenda, leads...
+│   ├── core/
+│   │   ├── llm.py           # Integracao OpenRouter + system prompt
+│   │   ├── shopify.py       # Pedidos, rastreio, produtos (GraphQL)
+│   │   ├── evolution.py     # Evolution API (WhatsApp)
 │   │   ├── automation_engine.py
-│   │   └── ...
-│   └── utils/               # Utilitários
-├── static/                  # Frontend (HTML/CSS/JS)
-│   ├── index.html
-│   ├── css/
-│   └── js/
-└── data/                    # Arquivos de áudio e dados temporários
+│   │   └── prospect_management/
+│   └── utils/
+└── static/                  # Frontend (HTML/CSS/JS)
 ```
 
 ## Acesso ao Painel
 
-Após subir, acesse `http://localhost:PORT` (ou seu domínio) e faça login com as credenciais definidas em `LOGIN_USER` / `LOGIN_PASSWORD`.
+Apos subir, acesse  e faca login com  / .
 
-A documentação da API estará disponível em `/api/docs`.
+Documentacao da API: 
 
-## Proxy Reverso (OpenLiteSpeed / Nginx)
-
-Configure um virtual host apontando para `http://127.0.0.1:HOST_PORT`. Exemplo Nginx:
+## Proxy Reverso
 
 ```nginx
 location / {
@@ -120,10 +147,10 @@ location / {
 }
 ```
 
-## Múltiplas Instâncias
+## Multiplas Instancias
 
-Para rodar o chatbot para diferentes lojas no mesmo servidor, clone o projeto em diretórios separados com `INSTANCE_ID` e `HOST_PORT` distintos em cada `.env`.
+Clone o projeto em diretorios separados com  e  distintos em cada .
 
-## Licença
+## Licenca
 
 MIT
