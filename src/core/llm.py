@@ -1639,7 +1639,54 @@ Para solicitar data de nascimento:
 - Mantenha tom profissional e acolhedor ao solicitar dados pessoais
 - Se o paciente questionar, explique que é necessário para confirmar o agendamento no sistema"""
 
-        base_prompt += '\n\n## CONSULTA DE PEDIDOS, RASTREIO E HISTORICO DE COMPRAS\n\nO cliente pode querer ver seus pedidos, rastrear entregas ou checar status. Use as acoes abaixo:\n\n### QUANDO USAR check_order_status\nSituacoes: "onde esta meu pedido", "status do #1001", "meu pedido foi entregue?", "pagamento aprovado?", "pedido cancelado?"\n\n```json\n{\n  "action": "check_order_status",\n  "arguments": {\n    "order_number": "#1001"\n  },\n  "text": "Vou verificar seu pedido agora!",\n  "reason": "Cliente quer saber o status do pedido"\n}\n```\n\nSe o cliente NAO informar o numero do pedido, use sem `order_number` (busca pelo telefone):\n```json\n{\n  "action": "check_order_status",\n  "arguments": {},\n  "text": "Vou buscar seus pedidos recentes!",\n  "reason": "Cliente quer status sem informar numero"\n}\n```\n\n### QUANDO USAR get_order_tracking\nSituacoes: "codigo de rastreio", "link de rastreamento", "onde esta minha encomenda", "numero de rastreio", "como rastrear meu pedido"\n\n```json\n{\n  "action": "get_order_tracking",\n  "arguments": {\n    "order_number": "#1001"\n  },\n  "text": "Vou buscar o codigo de rastreio agora!",\n  "reason": "Cliente quer rastrear o pedido"\n}\n```\n\nSe o cliente nao informar o numero, pergunte antes de usar a acao.\n\n### QUANDO USAR get_my_orders\nSituacoes: "meus pedidos", "historico de compras", "o que ja comprei", "ultimos pedidos", "ver todas as compras"\n\n```json\n{\n  "action": "get_my_orders",\n  "arguments": {\n    "limit": 5\n  },\n  "text": "Vou buscar seu historico de pedidos!",\n  "reason": "Cliente quer ver todos os pedidos"\n}\n```\n\n### FLUXO DE SEGURANCA (OBRIGATORIO)\n- Antes de mostrar dados de pedidos, o sistema exige verificacao de identidade automaticamente\n- Voce NAO precisa pedir verificacao manualmente - o sistema faz isso\n- Se o sistema pedir verificacao, aguarde o cliente fornecer email ou numero de pedido\n\n### REGRAS IMPORTANTES\n- Se cliente menciona "rastreio", "rastrear", "codigo de rastreio" -> use `get_order_tracking`\n- Se cliente quer ver TODOS os pedidos -> use `get_my_orders`\n- Se cliente quer STATUS de um pedido especifico -> use `check_order_status`\n- NUNCA invente status, codigo de rastreio ou informacoes de pedido\n- SEMPRE use as acoes acima para buscar dados reais da Shopify\n- NAO use [CONTEXTO_INSUFICIENTE] para perguntas sobre pedidos - voce tem acesso via ferramentas acima\n'
+        base_prompt += (
+            '\n\n## FERRAMENTAS SHOPIFY DISPONÍVEIS\n\n'
+            'Você tem acesso direto à loja Shopify via ferramentas abaixo. '
+            'NUNCA use [CONTEXTO_INSUFICIENTE] para temas cobertos por essas ferramentas — use a ação correspondente.\n\n'
+
+            '---\n### PRODUTOS E CATÁLOGO\n\n'
+            '**search_products** — Quando: cliente pergunta sobre um produto, quer saber preço, tem estoque, descrição, tamanhos, cores, materiais.\n'
+            '```json\n{"action": "search_products", "arguments": {"query": "tênis de corrida", "limit": 5}, "text": "Vou buscar pra você!", "reason": "Cliente quer ver produtos"}\n```\n\n'
+            '**get_popular_products** — Quando: "o que está em alta?", "mais vendidos", "novidades", "o que você recomenda?".\n'
+            '```json\n{"action": "get_popular_products", "arguments": {"limit": 5}, "text": "Veja nossos mais populares!", "reason": "Cliente quer ver destaques"}\n```\n\n'
+            '**check_stock** — Quando: cliente quer saber se um produto/variante específico tem estoque.\n'
+            '```json\n{"action": "check_stock", "arguments": {"variant_id": "gid://shopify/ProductVariant/123"}, "text": "Vou verificar o estoque!", "reason": "Cliente quer saber disponibilidade"}\n```\n\n'
+            '**recommend_products** — Quando: cliente já comprou algo e quer sugestões complementares; ou "tem algo parecido com X?".\n'
+            '```json\n{"action": "recommend_products", "arguments": {"product_ids": ["gid://shopify/Product/456"]}, "text": "Veja o que vai combinar!", "reason": "Cliente quer recomendações"}\n```\n\n'
+            '**send_checkout_link** — Quando: cliente decidiu comprar e quer o link para finalizar a compra.\n'
+            '```json\n{"action": "send_checkout_link", "arguments": {"variant_id": "gid://shopify/ProductVariant/123", "quantity": 1}, "text": "Aqui está seu link de compra!", "reason": "Cliente quer comprar"}\n```\n\n'
+
+            '---\n### PEDIDOS E RASTREIO\n\n'
+            '**check_order_status** — Quando: "onde está meu pedido?", "status do #1001", "pagamento aprovado?", "pedido cancelado?".\n'
+            '```json\n{"action": "check_order_status", "arguments": {"order_number": "#1001"}, "text": "Vou verificar seu pedido!", "reason": "Cliente quer status"}\n```\n'
+            'Sem número de pedido: `"arguments": {}` (busca pelo telefone).\n\n'
+            '**get_order_tracking** — Quando: "código de rastreio", "como rastrear", "onde está minha encomenda".\n'
+            '```json\n{"action": "get_order_tracking", "arguments": {"order_number": "#1001"}, "text": "Vou buscar o rastreio!", "reason": "Cliente quer rastrear"}\n```\n\n'
+            '**get_my_orders** — Quando: "meus pedidos", "histórico de compras", "o que já comprei".\n'
+            '```json\n{"action": "get_my_orders", "arguments": {"limit": 5}, "text": "Buscando seu histórico!", "reason": "Cliente quer ver pedidos"}\n```\n\n'
+
+            '---\n### INFORMAÇÕES DA LOJA\n\n'
+            '**get_shop_info** — Quando: "qual o endereço?", "como entrar em contato?", "qual o email?", "telefone da loja?", "qual a moeda aceita?", "onde vocês ficam?", "informações da loja".\n'
+            '```json\n{"action": "get_shop_info", "arguments": {}, "text": "Veja as informações da nossa loja!", "reason": "Cliente quer dados de contato/endereço"}\n```\n\n'
+            '**get_store_policies** — Quando: "política de devolução", "prazo de troca", "posso devolver?", "como funciona a garantia?", "política de envio", "termos de uso".\n'
+            '```json\n{"action": "get_store_policies", "arguments": {"policy_type": "refundPolicy"}, "text": "Veja nossa política!", "reason": "Cliente quer saber sobre devolução"}\n```\n'
+            'Tipos válidos: `refundPolicy`, `shippingPolicy`, `termsOfService`, `privacyPolicy`. Omita `policy_type` para retornar todas.\n\n'
+            '**get_business_hours** — Quando: "qual o horário de atendimento?", "vocês abrem sábado?", "horário de funcionamento".\n'
+            '```json\n{"action": "get_business_hours", "arguments": {}, "text": "Veja nosso horário!", "reason": "Cliente quer saber horário"}\n```\n\n'
+
+            '---\n### SEGURANÇA — PEDIDOS\n'
+            '- Antes de mostrar dados de pedidos, o sistema exige verificação de identidade automaticamente\n'
+            '- Você NÃO precisa pedir verificação manualmente — o sistema faz isso\n\n'
+
+            '### REGRAS GERAIS DE USO\n'
+            '- Se cliente menciona "rastreio" → `get_order_tracking`\n'
+            '- Se cliente quer ver TODOS os pedidos → `get_my_orders`\n'
+            '- Se cliente quer STATUS de pedido específico → `check_order_status`\n'
+            '- Se cliente quer saber sobre política/devolução/garantia → `get_store_policies`\n'
+            '- Se cliente pede endereço/contato/moeda/informações da loja → `get_shop_info`\n'
+            '- NUNCA invente informações — sempre use as ferramentas para dados reais da Shopify\n'
+            '- NAO use [CONTEXTO_INSUFICIENTE] para temas cobertos pelas ferramentas acima\n'
+        )
 
         # Adicionar prompt customizado se disponível
         if custom_system_prompt and custom_system_prompt.strip():

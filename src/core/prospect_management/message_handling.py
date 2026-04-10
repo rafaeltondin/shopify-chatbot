@@ -28,6 +28,7 @@ from src.core.shopify import (
     get_store_policies_for_chat,
     recommend_products_for_chat,
     verify_customer_for_chat,
+    get_shop_info_for_chat,
 )
 from src.core.prospect_management.state import (
     ProspectState, get_prospect, add_prospect_state,
@@ -43,15 +44,47 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────
-# Cache de contexto do cliente (evita consultar Shopify a cada msg)
+# Cache de contexto do cliente — Redis com fallback em memória
 # ─────────────────────────────────────────────
 import time as _time
 
+# Fallback em memória (usado quando Redis não está disponível)
 _customer_context_cache: Dict[str, Tuple[str, float]] = {}  # jid → (context_str, timestamp)
 _customer_interests: Dict[str, List[str]] = {}  # jid → [interesses detectados]
 _verified_customers: Dict[str, float] = {}  # jid → timestamp da verificação
 CONTEXT_CACHE_TTL = 600  # 10 minutos
 VERIFICATION_TTL = 1800  # 30 minutos — após verificar, não pede de novo por 30min
+
+
+async def _redis_get(key: str) -> Optional[str]:
+    """Busca valor no Redis. Retorna None se ausente ou Redis indisponível."""
+    try:
+        redis = settings.redis_client
+        if redis:
+            return await redis.get(key)
+    except Exception:
+        pass
+    return None
+
+
+async def _redis_set(key: str, value: str, ttl: int) -> None:
+    """Salva valor no Redis com TTL. Silencia erros (Redis opcional)."""
+    try:
+        redis = settings.redis_client
+        if redis:
+            await redis.setex(key, ttl, value)
+    except Exception:
+        pass
+
+
+async def _redis_delete(key: str) -> None:
+    """Remove chave do Redis. Silencia erros."""
+    try:
+        redis = settings.redis_client
+        if redis:
+            await redis.delete(key)
+    except Exception:
+        pass
 
 
 def _is_customer_verified(phone: str) -> bool:
@@ -68,18 +101,41 @@ def _mark_customer_verified(phone: str):
 
 
 async def _get_cached_customer_context(phone: str) -> str:
-    """Busca contexto do cliente com cache de 10 minutos."""
-    now = _time.monotonic()
+    """
+    Busca contexto do cliente com cache de 10 minutos.
+    Estratégia: Redis → memória → Shopify API.
+    """
+    redis_key = f"chatbot:ctx:{phone}"
 
+    # 1. Tentar Redis
+    cached_raw = await _redis_get(redis_key)
+    if cached_raw:
+        try:
+            data = json.loads(cached_raw)
+            interests = data.get("interests", [])
+            # Atualizar interesses em memória se necessário
+            if interests:
+                _customer_interests[phone] = interests
+            return data.get("context", "")
+        except Exception:
+            pass
+
+    # 2. Fallback: cache em memória
+    now = _time.monotonic()
     if phone in _customer_context_cache:
         cached_context, cached_at = _customer_context_cache[phone]
         if (now - cached_at) < CONTEXT_CACHE_TTL:
             return cached_context
 
-    # Cache expirado ou inexistente → buscar na Shopify
+    # 3. Buscar na Shopify
     interests = _customer_interests.get(phone, [])
     context = await get_customer_context_for_llm(phone, interests)
+
+    # Salvar em Redis e memória
+    payload = json.dumps({"context": context, "interests": interests}, ensure_ascii=False)
+    await _redis_set(redis_key, payload, CONTEXT_CACHE_TTL)
     _customer_context_cache[phone] = (context, now)
+
     return context
 
 
@@ -98,6 +154,12 @@ def _track_customer_interests(phone: str, interests: List[str]):
 def _invalidate_customer_cache(phone: str):
     """Invalida cache do cliente (chamado após ações que mudam o estado, ex: compra)."""
     _customer_context_cache.pop(phone, None)
+    # Invalidar no Redis de forma assíncrona (fire-and-forget via task)
+    import asyncio
+    try:
+        asyncio.create_task(_redis_delete(f"chatbot:ctx:{phone}"))
+    except RuntimeError:
+        pass  # Sem event loop ativo (contexto de teste)
 
 
 # ─────────────────────────────────────────────
@@ -494,6 +556,7 @@ async def _process_llm_response(prospect: ProspectState, response: Dict[str, Any
         "check_stock": _handle_check_stock,
         "get_store_policies": _handle_store_policies,
         "get_business_hours": _handle_business_hours,
+        "get_shop_info": _handle_shop_info,
     }
 
     if action in tool_actions:
@@ -1066,6 +1129,12 @@ async def _handle_business_hours(action_data: Dict, prospect: ProspectState):
             prospect.jid,
             "Não tenho essa informação no momento. Você pode conferir direto no site: www.fiberoficial.com.br 😊"
         )
+
+
+async def _handle_shop_info(action_data: Dict, prospect: ProspectState):
+    """Busca e envia informações da loja (endereço, contato, moeda) via Shopify API."""
+    info_text = await get_shop_info_for_chat()
+    await _send_text_message(prospect.jid, info_text)
 
 
 # ─────────────────────────────────────────────

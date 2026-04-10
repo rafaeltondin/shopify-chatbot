@@ -9,6 +9,12 @@ import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
+# TTLs para cache Redis (segundos)
+_CACHE_TTL_SHOP_INFO = 3600       # 1h — muda raramente
+_CACHE_TTL_POLICIES = 3600        # 1h — políticas são estáticas
+_CACHE_TTL_SHIPPING = 3600        # 1h — zonas de frete mudam pouco
+_CACHE_TTL_POPULAR = 300          # 5min — produtos populares podem mudar
+
 logger = logging.getLogger(__name__)
 
 # Será inicializado no lifespan
@@ -137,6 +143,16 @@ class ShopifyClient:
                         tags
                         createdAt
                         updatedAt
+                        metafields(first: 10) {{
+                            edges {{
+                                node {{
+                                    namespace
+                                    key
+                                    value
+                                    type
+                                }}
+                            }}
+                        }}
                     }}
                 }}
             }}
@@ -198,6 +214,16 @@ class ShopifyClient:
                 tags
                 createdAt
                 updatedAt
+                metafields(first: 10) {
+                    edges {
+                        node {
+                            namespace
+                            key
+                            value
+                            type
+                        }
+                    }
+                }
             }
         }
         """
@@ -502,8 +528,128 @@ class ShopifyClient:
         result = await self._graphql(gql, {"id": variant_id})
         return result.get("productVariant")
 
+    async def _get_redis(self):
+        """Retorna o cliente Redis das configurações (ou None se indisponível)."""
+        try:
+            from .config import settings
+            return settings.redis_client
+        except Exception:
+            return None
+
+    async def _cache_get(self, key: str) -> Optional[Any]:
+        """Busca valor no cache Redis. Retorna None se ausente ou erro."""
+        redis = await self._get_redis()
+        if not redis:
+            return None
+        try:
+            raw = await redis.get(key)
+            return json.loads(raw) if raw else None
+        except Exception as e:
+            logger.debug(f"Cache miss (Redis error) key={key}: {e}")
+            return None
+
+    async def _cache_set(self, key: str, value: Any, ttl: int) -> None:
+        """Salva valor no cache Redis com TTL em segundos."""
+        redis = await self._get_redis()
+        if not redis:
+            return
+        try:
+            await redis.setex(key, ttl, json.dumps(value, ensure_ascii=False))
+        except Exception as e:
+            logger.debug(f"Erro ao salvar cache Redis key={key}: {e}")
+
+    # ─────────────────────────────────────────────
+    # INFORMAÇÕES DA LOJA
+    # ─────────────────────────────────────────────
+    async def get_shop_info(self) -> Dict[str, Any]:
+        """
+        Busca informações básicas da loja: nome, email, telefone, endereço,
+        moeda e domínio. Resultado cacheado em Redis por 1h.
+        """
+        cache_key = f"shopify:{self.store_domain}:shop_info"
+        cached = await self._cache_get(cache_key)
+        if cached:
+            logger.debug("get_shop_info: retornando do cache Redis")
+            return cached
+
+        gql = """
+        {
+            shop {
+                name
+                email
+                phone
+                myshopifyDomain
+                primaryDomain { url }
+                currencyCode
+                weightUnit
+                description
+                billingAddress {
+                    address1
+                    address2
+                    city
+                    province
+                    zip
+                    country
+                    phone
+                }
+            }
+        }
+        """
+        try:
+            result = await self._graphql(gql)
+            shop = result.get("shop", {})
+            if shop:
+                await self._cache_set(cache_key, shop, _CACHE_TTL_SHOP_INFO)
+            return shop
+        except Exception as e:
+            logger.error(f"Erro ao buscar informações da loja: {e}")
+            return {}
+
+    def format_shop_info_for_chat(self, info: Dict[str, Any]) -> str:
+        """Formata informações da loja em texto legível para WhatsApp."""
+        if not info:
+            return "Não foi possível obter as informações da loja no momento."
+
+        lines = [f"🏪 *{info.get('name', 'Nossa loja')}*"]
+
+        if info.get("description"):
+            lines.append(info["description"])
+
+        addr = info.get("billingAddress", {})
+        if addr:
+            parts = [p for p in [
+                addr.get("address1"), addr.get("city"),
+                addr.get("province"), addr.get("country")
+            ] if p]
+            if parts:
+                lines.append("📍 " + ", ".join(parts))
+
+        phone = info.get("phone") or (addr or {}).get("phone")
+        if phone:
+            lines.append(f"📞 {phone}")
+
+        email = info.get("email")
+        if email:
+            lines.append(f"✉️ {email}")
+
+        domain = (info.get("primaryDomain") or {}).get("url")
+        if domain:
+            lines.append(f"🌐 {domain}")
+
+        currency = info.get("currencyCode")
+        if currency:
+            lines.append(f"💰 Moeda: {currency}")
+
+        return "\n".join(lines)
+
     async def get_shipping_zones(self) -> List[Dict]:
-        """Busca zonas de entrega configuradas na Shopify."""
+        """Busca zonas de entrega configuradas na Shopify. Cacheado em Redis por 1h."""
+        cache_key = f"shopify:{self.store_domain}:shipping_zones"
+        cached = await self._cache_get(cache_key)
+        if cached:
+            logger.debug("get_shipping_zones: retornando do cache Redis")
+            return cached
+
         gql = """
         {
             deliveryProfiles(first: 5) {
@@ -538,13 +684,22 @@ class ShopifyClient:
         """
         try:
             result = await self._graphql(gql)
-            return result.get("deliveryProfiles", {}).get("edges", [])
+            zones = result.get("deliveryProfiles", {}).get("edges", [])
+            if zones:
+                await self._cache_set(cache_key, zones, _CACHE_TTL_SHIPPING)
+            return zones
         except Exception as e:
             logger.error(f"Erro ao buscar zonas de entrega: {e}")
             return []
 
     async def get_shop_policies(self) -> Dict[str, str]:
-        """Busca políticas da loja (reembolso, privacidade, termos, envio)."""
+        """Busca políticas da loja (reembolso, privacidade, termos, envio). Cacheado em Redis por 1h."""
+        cache_key = f"shopify:{self.store_domain}:shop_policies"
+        cached = await self._cache_get(cache_key)
+        if cached:
+            logger.debug("get_shop_policies: retornando do cache Redis")
+            return cached
+
         gql = """
         {
             shop {
@@ -576,6 +731,8 @@ class ShopifyClient:
                     if len(body) > 500:
                         body = body[:500] + "..."
                     policies[key] = {"title": policy.get("title", ""), "body": body}
+            if policies:
+                await self._cache_set(cache_key, policies, _CACHE_TTL_POLICIES)
             return policies
         except Exception as e:
             logger.error(f"Erro ao buscar políticas da loja: {e}")
@@ -1078,8 +1235,22 @@ class ShopifyClient:
     # ─────────────────────────────────────────────
     # HELPERS PARA O CHATBOT
     # ─────────────────────────────────────────────
+    @staticmethod
+    def _extract_metafields(product: Dict) -> Dict[str, str]:
+        """Extrai metafields do produto em formato namespace.key → value."""
+        meta_edges = product.get("metafields", {}).get("edges", [])
+        result = {}
+        for edge in meta_edges:
+            node = edge.get("node", {})
+            ns = node.get("namespace", "")
+            key = node.get("key", "")
+            value = node.get("value", "")
+            if key and value:
+                result[f"{ns}.{key}"] = value
+        return result
+
     def format_product_for_chat(self, product: Dict) -> str:
-        """Formata informações de produto para envio via WhatsApp."""
+        """Formata informações de produto para envio via WhatsApp, incluindo metafields."""
         title = product.get("title", "Produto")
         description = product.get("description", "")
         if len(description) > 300:
@@ -1088,7 +1259,6 @@ class ShopifyClient:
         price_range = product.get("priceRangeV2", {})
         min_price = price_range.get("minVariantPrice", {}).get("amount", "0")
         max_price = price_range.get("maxVariantPrice", {}).get("amount", "0")
-        currency = price_range.get("minVariantPrice", {}).get("currencyCode", "BRL")
 
         if min_price == max_price:
             price_text = f"R$ {float(min_price):.2f}"
@@ -1109,6 +1279,29 @@ class ShopifyClient:
                 options.append(f"  - {', '.join(opt_names)} — R$ {float(node['price']):.2f}")
             variant_text = "\n*Opções:*\n" + "\n".join(options)
 
+        # Metafields relevantes (material, composição, cuidados, tamanhos, etc.)
+        meta = self._extract_metafields(product)
+        meta_labels = {
+            "custom.material": "Material",
+            "custom.composicao": "Composição",
+            "custom.cuidados": "Cuidados",
+            "custom.tabela_de_tamanhos": "Tabela de tamanhos",
+            "custom.garantia": "Garantia",
+            "custom.origem": "Origem",
+            "custom.peso": "Peso",
+        }
+        meta_lines = []
+        for field_key, label in meta_labels.items():
+            if field_key in meta and meta[field_key]:
+                meta_lines.append(f"ℹ️ *{label}:* {meta[field_key]}")
+        # Incluir qualquer outro metafield não mapeado (namespace custom ou global)
+        for fk, fv in meta.items():
+            if fk not in meta_labels and fv:
+                readable_key = fk.split(".")[-1].replace("_", " ").capitalize()
+                meta_lines.append(f"ℹ️ *{readable_key}:* {fv}")
+
+        meta_text = ("\n" + "\n".join(meta_lines)) if meta_lines else ""
+
         url = product.get("onlineStoreUrl", "")
         url_text = f"\n🔗 {url}" if url else ""
 
@@ -1118,6 +1311,7 @@ class ShopifyClient:
             f"📦 {stock_text}\n"
             f"\n{description}"
             f"{variant_text}"
+            f"{meta_text}"
             f"{url_text}"
         )
 
@@ -1382,6 +1576,22 @@ async def verify_customer_for_chat(phone: str, verification_data: Dict) -> Dict:
     if not client:
         return {"verified": False, "message": "Shopify não configurado."}
     return await client.verify_customer_identity(phone, verification_data)
+
+
+async def get_shop_info_for_chat() -> str:
+    """
+    Busca informações básicas da loja (nome, endereço, contato, moeda)
+    e retorna texto formatado para WhatsApp. Resultado cacheado em Redis por 1h.
+    """
+    client = get_shopify_client()
+    if not client:
+        return "Não foi possível obter as informações da loja no momento."
+    try:
+        info = await client.get_shop_info()
+        return client.format_shop_info_for_chat(info)
+    except Exception as e:
+        logger.error(f"Erro em get_shop_info_for_chat: {e}", exc_info=True)
+        return "Não foi possível obter as informações da loja no momento."
 
 
 async def get_customer_context_for_llm(phone: str, interests: List[str] = None) -> str:
