@@ -8,25 +8,27 @@ general:
   environment: "production"  # development, staging, production
 
 # Configurações de Modelos por Contexto
+# DeepSeek V3 (deepseek-chat) — excelente custo-benefício para conversação
+# DeepSeek R1 (deepseek-reasoner) — raciocínio avançado para agendamentos complexos
 models:
   conversation:
-    primary: "anthropic/claude-3.5-haiku"
+    primary: "deepseek-chat"
     fallbacks:
-      - "anthropic/claude-3.5-sonnet"
+      - "anthropic/claude-3.5-haiku"
       - "openai/gpt-4o"
     temperature: 0.7
     max_tokens: 4096
 
   scheduling:
-    primary: "anthropic/claude-3.5-haiku"
+    primary: "deepseek-chat"
     fallbacks:
+      - "anthropic/claude-3.5-haiku"
       - "openai/gpt-4o"
-      - "google/gemini-2.5-flash"
     temperature: 0.5  # Mais determinístico para agendamentos
     max_tokens: 2048
 
   formatting:
-    primary: "anthropic/claude-3.5-haiku"
+    primary: "deepseek-chat"
     fallbacks:
       - "anthropic/claude-3.5-haiku"
       - "openai/gpt-4o-mini"

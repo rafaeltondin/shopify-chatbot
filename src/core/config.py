@@ -127,6 +127,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None  # Fallback para transcrição de áudio
     OPENROUTER_BASE_URL: str = 'https://openrouter.ai/api/v1'
+
+    # DeepSeek — API direta (opcional, mais barato que OpenRouter)
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_BASE_URL: str = 'https://api.deepseek.com/v1'
     
     # Headers otimizados para OpenRouter
     APP_VERSION: str = "2.1.0"

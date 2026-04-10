@@ -266,15 +266,23 @@ class LLMManager:
 
     def __init__(self):
         self.client: Optional[AsyncOpenAI] = None
+        self.deepseek_client: Optional[AsyncOpenAI] = None
         self._initialized = False
         logger.info("LLMManager criado")
 
+    def _get_client_for_model(self, model: str) -> AsyncOpenAI:
+        """Retorna o cliente correto baseado no nome do modelo."""
+        if self.deepseek_client and model.startswith("deepseek"):
+            return self.deepseek_client
+        return self.client
+
     async def initialize(self):
-        """Inicializa o cliente LLM com configurações otimizadas"""
+        """Inicializa clientes LLM (OpenRouter + DeepSeek direto se configurado)"""
         try:
             if self._initialized and self.client:
                 return
 
+            # ── Cliente OpenRouter (mantido como fallback) ──
             api_key = settings.OPENROUTER_API_KEY
             if not api_key:
                 logger.critical("FATAL: OPENROUTER_API_KEY não está configurada.")
@@ -288,8 +296,19 @@ class LLMManager:
                 timeout=settings.LLM_TIMEOUT,
                 max_retries=0
             )
+
+            # ── Cliente DeepSeek direto (opcional) ──
+            if settings.DEEPSEEK_API_KEY:
+                self.deepseek_client = AsyncOpenAI(
+                    base_url=settings.DEEPSEEK_BASE_URL,
+                    api_key=settings.DEEPSEEK_API_KEY,
+                    timeout=settings.LLM_TIMEOUT,
+                    max_retries=0
+                )
+                logger.info("DeepSeek client inicializado (API direta)")
+
             self._initialized = True
-            logger.info("LLMManager inicializado com headers otimizados OpenRouter")
+            logger.info("LLMManager inicializado")
         except Exception as e:
             logger.error(f"Falha ao inicializar LLMManager: {e}", exc_info=True)
             raise
@@ -341,8 +360,10 @@ class LLMManager:
         completion_params = await self._prepare_completion_params(messages, task_type, tools, **kwargs)
         original_max_tokens = completion_params.get('max_tokens', 4096)
 
+        _client = self._get_client_for_model(completion_params.get("model", ""))
+
         async def make_request():
-            return await self.client.chat.completions.create(**completion_params)
+            return await _client.chat.completions.create(**completion_params)
 
         try:
             completion = await retry_with_exponential_backoff(make_request)
