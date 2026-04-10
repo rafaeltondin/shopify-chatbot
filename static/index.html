@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopify Chatbot — Painel de Controle</title>
+  <link rel="icon" type="image/png" href="/static/content/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* =============================================
+       RESET & BASE
+    ============================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #000000;
+      --card:      #1A1A1A;
+      --border:    #333333;
+      --radius:    20px;
+      --cta:       #D0FF59;
+      --cta-hover: #B8E64C;
+      --blue:      #2D54FF;
+      --pink:      #ff69b4;
+      --text:      #F5F5F5;
+      --muted:     #A0A0A0;
+      --success:   #22c55e;
+      --error:     #ef4444;
+      --warning:   #f59e0b;
+      --sidebar-w: 260px;
+      --font:      'Poppins', sans-serif;
+      --transition: 0.2s ease;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      overflow: hidden;
+    }
+
+    /* =============================================
+       LAYOUT
+    ============================================= */
+    #app {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* =============================================
+       SIDEBAR
+    ============================================= */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: transform var(--transition);
+      z-index: 100;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo img {
+      width: 140px;
+      height: auto;
+      display: block;
+    }
+
+    .sidebar-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .status-dot.online  { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status-dot.offline { background: var(--error); }
+
+    .sidebar-nav {
+      padding: 12px 12px;
+      flex: 1;
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 16px 8px 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      transition: background var(--transition), color var(--transition);
+      user-select: none;
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: rgba(208, 255, 89, 0.12);
+      color: var(--cta);
+    }
+
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-logout {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-logout:hover {
+      background: rgba(239,68,68,0.1);
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    /* =============================================
+       MAIN CONTENT
+    ============================================= */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .topbar-title { font-size: 18px; font-weight: 700; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .mobile-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .content { padding: 28px; flex: 1; }
+
+    /* =============================================
+       CARDS
+    ============================================= */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 20px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-body { padding: 20px 24px 24px; }
+
+    /* =============================================
+       STAT CARDS
+    ============================================= */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-card .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-card .stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .stat-card .stat-delta {
+      font-size: 12px;
+      color: var(--success);
+    }
+
+    .stat-cta   .stat-value { color: var(--cta); }
+    .stat-blue  .stat-value { color: var(--blue); }
+    .stat-pink  .stat-value { color: var(--pink); }
+    .stat-white .stat-value { color: var(--text); }
+
+    /* =============================================
+       BUTTONS
+    ============================================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--cta);
+      color: #000;
+    }
+    .btn-primary:hover { background: var(--cta-hover); }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--cta); color: var(--cta); }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.15);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+    .btn-icon { padding: 8px; border-radius: 10px; }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* =============================================
+       FORMS
+    ============================================= */
+    .form-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .form-section-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .form-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-section-title svg { width: 18px; height: 18px; color: var(--cta); stroke: var(--cta); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .form-section-body { padding: 24px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .form-grid-full { grid-column: 1 / -1; }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .form-label .required {
+      color: var(--cta);
+      margin-left: 3px;
+    }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .form-control {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition);
+      width: 100%;
+    }
+
+    .form-control:focus { border-color: var(--cta); }
+    .form-control::placeholder { color: var(--muted); }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .form-control-mono {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    select.form-control {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23A0A0A0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+
+    select.form-control option { background: #1A1A1A; color: var(--text); }
+
+    /* Range slider */
+    .range-wrapper { display: flex; align-items: center; gap: 12px; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--cta);
+      cursor: pointer;
+    }
+
+    .range-value {
+      min-width: 32px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--cta);
+      font-size: 13px;
+    }
+
+    /* Toggle switch */
+    .toggle-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 24px;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform var(--transition);
+    }
+
+    .toggle input:checked + .toggle-slider { background: var(--cta); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    .toggle-label { font-size: 13px; color: var(--text); cursor: pointer; }
+
+    /* Checkboxes */
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      appearance: none;
+      cursor: pointer;
+      background: rgba(255,255,255,0.04);
+      flex-shrink: 0;
+      position: relative;
+      transition: all var(--transition);
+    }
+
+    .checkbox-item input[type="checkbox"]:checked {
+      background: var(--cta);
+      border-color: var(--cta);
+    }
+
+    .checkbox-item input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 5px;
+      height: 9px;
+      border: 2px solid #000;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+
+    /* Connection test row */
+    .connection-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .conn-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .conn-status.ok    { color: var(--success); border-color: var(--success); background: rgba(34,197,94,0.08); }
+    .conn-status.fail  { color: var(--error);   border-color: var(--error);   background: rgba(239,68,68,0.08); }
+    .conn-status.checking { color: var(--warning); border-color: var(--warning); }
+
+    /* Form footer */
+    .form-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* =============================================
+       QR CODE AREA
+    ============================================= */
+    .qr-area {
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .qr-area img { max-width: 200px; margin: 12px auto; display: block; }
+
+    /* =============================================
+       TABLE
+    ============================================= */
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      background: rgba(255,255,255,0.03);
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 14px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* =============================================
+       BADGES
+    ============================================= */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-success { background: rgba(34,197,94,0.15);  color: var(--success); }
+    .badge-error   { background: rgba(239,68,68,0.15);  color: var(--error); }
+    .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .badge-muted   { background: rgba(255,255,255,0.08); color: var(--muted); }
+    .badge-cta     { background: rgba(208,255,89,0.12); color: var(--cta); }
+
+    /* =============================================
+       CONVERSATION LIST
+    ============================================= */
+    .conv-list { display: flex; flex-direction: column; gap: 0; }
+
+    .conv-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 20px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background var(--transition);
+    }
+
+    .conv-item:last-child { border-bottom: none; }
+    .conv-item:hover { background: rgba(255,255,255,0.03); }
+
+    .conv-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue), var(--pink));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .conv-info { flex: 1; min-width: 0; }
+    .conv-name { font-weight: 600; font-size: 13px; }
+    .conv-preview { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .conv-meta { text-align: right; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .conv-unread { display: block; background: var(--cta); color: #000; border-radius: 9999px; font-size: 10px; font-weight: 700; padding: 1px 6px; text-align: center; margin-top: 4px; }
+
+    /* =============================================
+       HEALTH INDICATORS
+    ============================================= */
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+    .health-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .health-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .health-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .health-icon.green { background: rgba(34,197,94,0.15); color: var(--success); }
+    .health-icon.red   { background: rgba(239,68,68,0.15); color: var(--error); }
+    .health-icon.gray  { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+    .health-label { font-size: 12px; color: var(--muted); }
+    .health-value { font-size: 13px; font-weight: 700; }
+
+    /* =============================================
+       PAGE HEADER
+    ============================================= */
+    .page-header { margin-bottom: 24px; }
+    .page-title  { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+    .page-desc   { font-size: 13px; color: var(--muted); }
+
+    /* =============================================
+       GRID UTILITIES
+    ============================================= */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .mb-4  { margin-bottom: 16px; }
+    .mb-6  { margin-bottom: 24px; }
+    .mt-4  { margin-top: 16px; }
+    .gap-2 { gap: 8px; }
+    .flex  { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+
+    /* =============================================
+       TOASTS
+    ============================================= */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 260px;
+      max-width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: toastIn 0.3s ease forwards;
+      pointer-events: all;
+    }
+
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error   { border-left: 3px solid var(--error); }
+    .toast.info    { border-left: 3px solid var(--blue); }
+
+    @keyframes toastIn  { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateX(0); }    to { opacity: 0; transform: translateX(40px); } }
+
+    /* =============================================
+       LOGIN PAGE
+    ============================================= */
+    #login-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-logo {
+      display: block;
+      width: 120px;
+      margin: 0 auto 28px;
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+
+    .login-error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--error);
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* =============================================
+       MODAL
+    ============================================= */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 640px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 { font-size: 16px; font-weight: 700; }
+    .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; padding: 4px; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 24px; }
+
+    /* =============================================
+       MOBILE RESPONSIVE
+    ============================================= */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open { transform: translateX(0); }
+
+      .mobile-toggle { display: flex !important; }
+
+      .content { padding: 16px; }
+
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+      .connection-row { grid-template-columns: 1fr; }
+    }
+
+    /* =============================================
+       SCROLLBAR
+    ============================================= */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    /* =============================================
+       LOADING SPINNER
+    ============================================= */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--cta);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      color: var(--muted);
+      gap: 12px;
+    }
+
+    /* =============================================
+       EMPTY STATE
+    ============================================= */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+
+    .empty-state svg { width: 48px; height: 48px; margin: 0 auto 16px; opacity: 0.4; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-state p  { font-size: 13px; }
+
+    /* =============================================
+       HIGHLIGHT ACTIVE SECTION
+    ============================================= */
+    .form-section:focus-within {
+      border-color: rgba(208, 255, 89, 0.3);
+    }
+
+    /* =============================================
+       MOBILE OVERLAY
+    ============================================= */
+    #mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Mobile overlay -->
+<div id="mobile-overlay" onclick="closeMobileSidebar()"></div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <img src="https://riwerlabs.com/wp-content/uploads/2025/07/Logotipo-4.png"
+         alt="Riwer Labs" class="login-logo"
+         onerror="this.style.display='none'">
+    <h2 class="login-title">Painel do Chatbot</h2>
+    <p class="login-subtitle">Acesse para configurar seu atendente</p>
+    <div id="login-error" class="login-error"></div>
+    <form id="login-form">
+      <div class="form-group mb-4">
+        <label class="form-label">Usuário</label>
+        <input type="text" id="login-user" class="form-control" placeholder="Digite seu usuário" autocomplete="username" required>
+      </div>
+      <div class="form-group mb-6">
+        <label class="form-label">Senha</label>
+        <input type="password" id="login-pass" class="form-control" placeholder="Digite sua senha" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;" id="login-btn">
+        <span>Entrar</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- MAIN APP (shown after login) -->
+<div id="app" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="https://riwerlabs.com/wp-content/uploads/2025/07/Logotipo-4.png"
+           alt="Riwer Labs"
+           onerror="this.alt='Shopify Chatbot'; this.style.fontSize='14px'; this.style.fontWeight='700';">
+    </div>
+
+    <div class="sidebar-status">
+      <span class="status-dot" id="agent-status-dot"></span>
+      <span id="agent-status-text">Verificando...</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+
+      <div class="nav-item active" onclick="navigateTo('dashboard')" id="nav-dashboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+
+      <div class="nav-item" onclick="navigateTo('config')" id="nav-config">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        Configuração
+      </div>
+
+      <div class="nav-item" onclick="navigateTo('conversas')" id="nav-conversas">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Conversas
+      </div>
+
+      <div class="nav-item" onclick="navigateTo('followup')" id="nav-followup">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Follow-up
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="logout()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sair
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main" id="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mobile-toggle" id="mobile-toggle" onclick="toggleMobileSidebar()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span class="topbar-title" id="page-title">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <span style="font-size:12px;color:var(--muted);" id="topbar-date"></span>
+      </div>
+    </div>
+
+    <div class="content" id="page-content">
+      <!-- Page content injected here -->
+    </div>
+  </div>
+
+</div>
+
+<!-- CONVERSATION HISTORY MODAL -->
+<div class="modal-backdrop" id="conv-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="conv-modal-title">Histórico de Conversa</h3>
+      <button class="modal-close" onclick="closeModal('conv-modal')">&times;</button>
+    </div>
+    <div class="modal-body" id="conv-modal-body">
+      <div class="loading-center"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==============================================================
+// SHOPIFY CHATBOT DASHBOARD — SPA
+// Riwer Labs Design System
+// ==============================================================
+
+console.log('[App] Inicializando painel do Shopify Chatbot...');
+
+// -------------------------------------------------------
+// ESTADO GLOBAL
+// -------------------------------------------------------
+const STATE = {
+  token: null,
+  currentPage: 'dashboard',
+  agentOnline: false,
+  dashStats: null,
+  conversas: [],
+  config: {},
+};
+
+// -------------------------------------------------------
+// AUTH
+// -------------------------------------------------------
+function getToken() {
+  return localStorage.getItem('shopify_chatbot_token');
+}
+
+function setToken(token) {
+  localStorage.setItem('shopify_chatbot_token', token);
+  STATE.token = token;
+}
+
+function clearToken() {
+  localStorage.removeItem('shopify_chatbot_token');
+  STATE.token = null;
+}
+
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${STATE.token}`,
+  };
+}
+
+// -------------------------------------------------------
+// API HELPER
+// -------------------------------------------------------
+async function apiRequest(method, path, body = null) {
+  console.log(`[API] ${method} ${path}`);
+  const opts = {
+    method,
+    headers: authHeaders(),
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  try {
+    const res = await fetch('/api' + path, opts);
+    if (res.status === 401) {
+      console.warn('[API] 401 — sessão expirada');
+      clearToken();
+      showLogin();
+      return null;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error(`[API] Erro ${res.status}:`, data);
+      throw new Error(data.detail || data.message || `Erro ${res.status}`);
+    }
+    console.log(`[API] Resposta ${path}:`, data);
+    return data;
+  } catch (err) {
+    console.error(`[API] Falha em ${path}:`, err.message);
+    throw err;
+  }
+}
+
+// -------------------------------------------------------
+// TOAST
+// -------------------------------------------------------
+function showToast(msg, type = 'info', duration = 4000) {
+  console.log(`[Toast] ${type}: ${msg}`);
+  const container = document.getElementById('toast-container');
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `${icons[type] || icons.info} <span>${msg}</span>`;
+  container.appendChild(el);
+
+  setTimeout(() => {
+    el.style.animation = 'toastOut 0.3s ease forwards';
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+}
+
+// -------------------------------------------------------
+// MODAL
+// -------------------------------------------------------
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// -------------------------------------------------------
+// NAVIGATION
+// -------------------------------------------------------
+const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  config:    'Configuração do Agente',
+  conversas: 'Conversas',
+  followup:  'Follow-up',
+};
+
+function navigateTo(page) {
+  console.log(`[Nav] Navegando para: ${page}`);
+  STATE.currentPage = page;
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const navEl = document.getElementById(`nav-${page}`);
+  if (navEl) navEl.classList.add('active');
+
+  // Update title
+  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+
+  // Render page
+  const container = document.getElementById('page-content');
+  switch (page) {
+    case 'dashboard': renderDashboard(container); break;
+    case 'config':    renderConfig(container);    break;
+    case 'conversas': renderConversas(container); break;
+    case 'followup':  renderFollowup(container);  break;
+  }
+
+  // Close mobile sidebar
+  closeMobileSidebar();
+}
+
+// -------------------------------------------------------
+// MOBILE SIDEBAR
+// -------------------------------------------------------
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('mobile-overlay');
+  sidebar.classList.toggle('open');
+  overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
+}
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobile-overlay').style.display = 'none';
+}
+
+// -------------------------------------------------------
+// LOGIN
+// -------------------------------------------------------
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  console.log('[Login] Tentativa de login...');
+
+  const btn  = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div> Entrando...';
+
+  try {
+    // Try form-urlencoded (FastAPI OAuth2 standard)
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`,
+    });
+
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+
+    if (!res.ok) {
+      const msg = data.detail || data.message || 'Credenciais inválidas';
+      console.error('[Login] Falha:', msg);
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const token = data.access_token || data.token;
+    if (!token) {
+      errEl.textContent = 'Resposta inválida do servidor';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    setToken(token);
+    console.log('[Login] Sucesso — token armazenado');
+    showApp();
+    initApp();
+
+  } catch (err) {
+    console.error('[Login] Erro de rede:', err);
+    errEl.textContent = 'Erro de conexão. Tente novamente.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>Entrar</span>';
+  }
+});
+
+function logout() {
+  console.log('[Auth] Saindo...');
+  clearToken();
+  showLogin();
+  showToast('Você saiu da conta', 'info');
+}
+
+// -------------------------------------------------------
+// INIT
+// -------------------------------------------------------
+function initApp() {
+  console.log('[App] Inicializando aplicação principal...');
+
+  // Data no topbar
+  document.getElementById('topbar-date').textContent =
+    new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+
+  // Check agent status
+  checkAgentStatus();
+  setInterval(checkAgentStatus, 30000);
+
+  // Render initial page
+  navigateTo('dashboard');
+}
+
+async function checkAgentStatus() {
+  console.log('[Status] Verificando status do agente...');
+  try {
+    const data = await apiRequest('GET', '/status');
+    const online = data && (data.status === 'ok' || data.status === 'online' || data.whatsapp_connected === true);
+    STATE.agentOnline = online;
+    const dot  = document.getElementById('agent-status-dot');
+    const text = document.getElementById('agent-status-text');
+    if (dot && text) {
+      dot.className  = `status-dot ${online ? 'online' : 'offline'}`;
+      text.textContent = online ? 'Atendente online' : 'Atendente offline';
+    }
+    console.log(`[Status] Agente: ${online ? 'online' : 'offline'}`);
+  } catch (err) {
+    console.warn('[Status] Não foi possível verificar o status:', err.message);
+    const dot  = document.getElementById('agent-status-dot');
+    const text = document.getElementById('agent-status-text');
+    if (dot && text) {
+      dot.className  = 'status-dot offline';
+      text.textContent = 'Status desconhecido';
+    }
+  }
+}
+
+// -------------------------------------------------------
+// PAGE: DASHBOARD
+// -------------------------------------------------------
+async function renderDashboard(container) {
+  console.log('[Dashboard] Renderizando página...');
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-desc">Visão geral do seu atendente de vendas no WhatsApp.</p>
+    </div>
+
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card stat-cta">
+        <span class="stat-label">Conversas Ativas</span>
+        <span class="stat-value" id="stat-conv">—</span>
+        <span class="stat-delta">Hoje</span>
+      </div>
+      <div class="stat-card stat-blue">
+        <span class="stat-label">Mensagens Hoje</span>
+        <span class="stat-value" id="stat-msgs">—</span>
+        <span class="stat-delta">Últimas 24h</span>
+      </div>
+      <div class="stat-card stat-pink">
+        <span class="stat-label">Pedidos Influenciados</span>
+        <span class="stat-value" id="stat-orders">—</span>
+        <span class="stat-delta">Este mês</span>
+      </div>
+      <div class="stat-card stat-white">
+        <span class="stat-label">Taxa de Conversão</span>
+        <span class="stat-value" id="stat-conv-rate">—</span>
+        <span class="stat-delta">Geral</span>
+      </div>
+    </div>
+
+    <div class="grid-2 mb-6">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Conversas Recentes
+          </span>
+          <button class="btn btn-sm btn-outline" onclick="navigateTo('conversas')">Ver todas</button>
+        </div>
+        <div class="card-body" style="padding-top:8px;">
+          <div id="recent-convs" class="conv-list">
+            <div class="loading-center" style="padding:30px;">
+              <div class="spinner"></div> <span>Carregando...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Saúde do Sistema
+          </span>
+          <button class="btn btn-sm btn-outline" onclick="checkAllHealth()">Atualizar</button>
+        </div>
+        <div class="card-body">
+          <div class="health-grid" id="health-grid">
+            ${buildHealthItem('Shopify API', 'checking', 'shopify')}
+            ${buildHealthItem('WhatsApp (Evolution)', 'checking', 'whatsapp')}
+            ${buildHealthItem('LLM / IA', 'checking', 'llm')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Load stats
+  loadDashboardStats();
+  loadRecentConvs();
+  checkAllHealth();
+}
+
+function buildHealthItem(label, status, key) {
+  const icons = {
+    shopify:   '<svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>',
+    whatsapp:  '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+    llm:       '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 110 20 10 10 0 010-20zm0 6v4l3 3"/></svg>',
+  };
+  const icon    = icons[key] || icons.shopify;
+  const cls     = status === 'ok' ? 'green' : status === 'fail' ? 'red' : 'gray';
+  const valText = status === 'ok' ? 'Conectado' : status === 'fail' ? 'Offline' : 'Verificando...';
+  return `
+    <div class="health-item" id="health-${key}">
+      <div class="health-icon ${cls}">${icon}</div>
+      <div>
+        <div class="health-label">${label}</div>
+        <div class="health-value">${valText}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function loadDashboardStats() {
+  console.log('[Dashboard] Carregando estatísticas...');
+  try {
+    const data = await apiRequest('GET', '/dashboard/stats');
+    if (!data) return;
+
+    const elConv = document.getElementById('stat-conv');
+    const elMsgs = document.getElementById('stat-msgs');
+    const elOrders = document.getElementById('stat-orders');
+    const elRate = document.getElementById('stat-conv-rate');
+    if (!elConv) return; // Página mudou, elementos não existem mais
+    elConv.textContent      = data.active_conversations ?? data.total_prospects ?? '0';
+    elMsgs.textContent      = data.messages_today ?? data.messages_sent ?? '0';
+    if (elOrders) elOrders.textContent    = data.orders_influenced ?? data.conversions ?? '0';
+    if (elRate) elRate.textContent = data.conversion_rate ? `${data.conversion_rate}%` : '0%';
+
+    console.log('[Dashboard] Estatísticas carregadas:', data);
+  } catch (err) {
+    console.warn('[Dashboard] Não foi possível carregar stats:', err.message);
+    ['stat-conv','stat-msgs','stat-orders','stat-conv-rate'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '–';
+    });
+  }
+}
+
+async function loadRecentConvs() {
+  console.log('[Dashboard] Carregando conversas recentes...');
+  const container = document.getElementById('recent-convs');
+  if (!container) return;
+
+  try {
+    const data = await apiRequest('GET', '/prospects?limit=6');
+    const items = data?.prospects || data?.items || data?.data || [];
+
+    if (!items.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <h3>Sem conversas ainda</h3>
+          <p>As conversas aparecerão aqui assim que clientes enviarem mensagens.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(p => {
+      const name    = p.name || p.phone_number || p.jid || 'Desconhecido';
+      const initials = name.charAt(0).toUpperCase();
+      const preview = p.last_message || 'Sem mensagem';
+      const time    = p.last_interaction ? new Date(p.last_interaction).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const unread  = p.unread_count > 0 ? `<span class="conv-unread">${p.unread_count}</span>` : '';
+      return `
+        <div class="conv-item" onclick="openConvHistory('${p.jid || p.id || p.phone_number}', '${name.replace(/'/g,"\\'")}')">
+          <div class="conv-avatar">${initials}</div>
+          <div class="conv-info">
+            <div class="conv-name">${name}</div>
+            <div class="conv-preview">${preview.substring(0, 60)}</div>
+          </div>
+          <div class="conv-meta">${time}${unread}</div>
+        </div>`;
+    }).join('');
+    console.log(`[Dashboard] ${items.length} conversas renderizadas`);
+  } catch (err) {
+    console.warn('[Dashboard] Erro ao carregar conversas:', err.message);
+    container.innerHTML = `<div class="empty-state"><p>Não foi possível carregar conversas.</p></div>`;
+  }
+}
+
+async function checkAllHealth() {
+  console.log('[Health] Verificando todos os serviços...');
+  const services = [
+    { key: 'shopify',  endpoint: '/health/shopify',   label: 'Shopify API' },
+    { key: 'whatsapp', endpoint: '/health/evolution',  label: 'WhatsApp (Evolution)' },
+    { key: 'llm',      endpoint: '/health/llm',        label: 'LLM / IA' },
+  ];
+
+  for (const svc of services) {
+    const el = document.getElementById(`health-${svc.key}`);
+    if (!el) continue;
+
+    try {
+      const data = await apiRequest('GET', svc.endpoint);
+      const ok = data && (data.status === 'ok' || data.connected === true || data.healthy === true);
+      const cls = ok ? 'green' : 'red';
+      const val = ok ? 'Conectado' : 'Offline';
+      el.querySelector('.health-icon').className = `health-icon ${cls}`;
+      el.querySelector('.health-value').textContent = val;
+      console.log(`[Health] ${svc.key}: ${val}`);
+    } catch {
+      el.querySelector('.health-icon').className = 'health-icon red';
+      el.querySelector('.health-value').textContent = 'Erro';
+      console.warn(`[Health] ${svc.key}: erro`);
+    }
+  }
+}
+
+// -------------------------------------------------------
+// PAGE: CONFIGURAÇÃO DO AGENTE
+// -------------------------------------------------------
+function renderConfig(container) {
+  console.log('[Config] Renderizando página de configuração...');
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">Configuração do Agente</h1>
+      <p class="page-desc">Configure como seu atendente virtual funciona no WhatsApp.</p>
+    </div>
+
+    <!-- 2.1 IDENTIDADE -->
+    <div class="form-section" id="section-identity">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Identidade do Agente
+        </span>
+      </div>
+      <div class="form-section-body">
+        <p class="form-hint mb-4" style="color:var(--muted);font-size:12px;background:rgba(208,255,89,0.06);border:1px solid rgba(208,255,89,0.15);border-radius:10px;padding:12px 14px;">
+          <strong style="color:var(--cta);">Dica importante:</strong> O nome que você escolher será usado pelo atendente em todas as conversas. Ele <strong>nunca dirá que é um robô</strong> — sempre se apresentará como humano com esse nome.
+        </p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Nome do atendente <span class="required">*</span></label>
+            <input type="text" id="cfg-agent-name" class="form-control" placeholder="Ex: Ana, Carlos, Lia..." maxlength="50">
+            <span class="form-hint">Como o atendente se apresenta no WhatsApp</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nome da loja <span class="required">*</span></label>
+            <input type="text" id="cfg-store-name" class="form-control" placeholder="Ex: Moda Bella, TechStore...">
+            <span class="form-hint">Nome da sua loja para contexto do atendente</span>
+          </div>
+          <div class="form-group form-grid-full">
+            <label class="form-label">Personalidade do agente</label>
+            <textarea id="cfg-personality" class="form-control" rows="3" placeholder="Simpática, prestativa e objetiva. Foca em ajudar o cliente a encontrar o produto certo e conclui a venda de forma natural."></textarea>
+            <span class="form-hint">Descreva como o atendente deve se comportar nas conversas</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('identity')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('identity')">Salvar Identidade</button>
+      </div>
+    </div>
+
+    <!-- 2.2 SHOPIFY -->
+    <div class="form-section" id="section-shopify">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+          Conexão Shopify
+        </span>
+        <span class="conn-status" id="shopify-conn-status">Não testado</span>
+      </div>
+      <div class="form-section-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">URL da loja <span class="required">*</span></label>
+            <input type="text" id="cfg-shop-url" class="form-control" placeholder="minha-loja.myshopify.com">
+            <span class="form-hint">Apenas o domínio, sem https://</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Access Token <span class="required">*</span></label>
+            <input type="password" id="cfg-shop-token" class="form-control" placeholder="shpat_xxxxxxxxxxxx">
+            <span class="form-hint">Token de acesso da API Shopify Admin</span>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-outline btn-sm" onclick="testShopifyConnection()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Testar conexão
+          </button>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('shopify')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('shopify')">Salvar Shopify</button>
+      </div>
+    </div>
+
+    <!-- 2.3 EVOLUTION API -->
+    <div class="form-section" id="section-evolution">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Conexão WhatsApp (Evolution API)
+        </span>
+        <span class="conn-status" id="evolution-conn-status">Não testado</span>
+      </div>
+      <div class="form-section-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">URL da Evolution API <span class="required">*</span></label>
+            <input type="text" id="cfg-evo-url" class="form-control" placeholder="https://api.evolution.com">
+            <span class="form-hint">URL base da sua instância Evolution API</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">API Key <span class="required">*</span></label>
+            <input type="password" id="cfg-evo-key" class="form-control" placeholder="sua-api-key-secreta">
+            <span class="form-hint">Chave de autenticação da Evolution API</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nome da instância <span class="required">*</span></label>
+            <input type="text" id="cfg-evo-instance" class="form-control" placeholder="minha-instancia">
+            <span class="form-hint">Nome da instância WhatsApp configurada</span>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-outline btn-sm" onclick="testEvolutionConnection()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Testar conexão
+          </button>
+        </div>
+
+        <!-- QR Code area -->
+        <div class="qr-area mt-4" id="qr-area">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px;display:block;opacity:0.4;"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h2v2h-2zm2 2h2v2h-2zm-2 2h2"/></svg>
+          <p>QR Code aparecerá aqui quando precisar reconectar o WhatsApp</p>
+          <button class="btn btn-sm btn-outline mt-4" style="margin-top:12px;" onclick="fetchQRCode()">Gerar QR Code</button>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('evolution')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('evolution')">Salvar WhatsApp</button>
+      </div>
+    </div>
+
+    <!-- 2.4 IA -->
+    <div class="form-section" id="section-ai">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 110 20 10 10 0 010-20zm0 6v4l3 3"/></svg>
+          Inteligência Artificial
+        </span>
+      </div>
+      <div class="form-section-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Modelo de IA preferido</label>
+            <select id="cfg-ai-model" class="form-control">
+              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Recomendado)</option>
+              <option value="openai/gpt-4o">GPT-4o (OpenAI)</option>
+              <option value="google/gemini-2.0-flash-exp">Gemini 2.0 Flash (Google)</option>
+              <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku (Rápido)</option>
+              <option value="glm-4.7-flash">GLM 4.7 Flash (Alta performance)</option>
+            </select>
+            <span class="form-hint">Escolha o modelo de linguagem para o atendente</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Temperatura (criatividade)</label>
+            <div class="range-wrapper">
+              <input type="range" id="cfg-ai-temp" min="0" max="1" step="0.1" value="0.7"
+                     oninput="document.getElementById('temp-val').textContent=this.value">
+              <span class="range-value" id="temp-val">0.7</span>
+            </div>
+            <span class="form-hint">0 = respostas diretas / 1 = mais criativo e variado</span>
+          </div>
+          <div class="form-group form-grid-full">
+            <label class="form-label">Prompt do sistema (instrução base)</label>
+            <textarea id="cfg-system-prompt" class="form-control form-control-mono" rows="8"
+              placeholder="Você é [NOME], atendente de [LOJA]. Sua missão é ajudar os clientes a encontrarem o produto ideal..."></textarea>
+            <span class="form-hint">Instruções base para o comportamento do atendente. Use {agent_name} e {store_name} como variáveis.</span>
+          </div>
+          <div class="form-group form-grid-full">
+            <label class="form-label">Contexto dos produtos / loja</label>
+            <textarea id="cfg-product-context" class="form-control" rows="5"
+              placeholder="Ex: Somos uma loja de moda feminina premium. Trabalhamos com tamanhos P ao GG. Nossos produtos mais vendidos são..."></textarea>
+            <span class="form-hint">Descreva seus produtos, diferenciais, políticas e informações relevantes da loja</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('ai')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('ai')">Salvar IA</button>
+      </div>
+    </div>
+
+    <!-- 2.5 FOLLOW-UP -->
+    <div class="form-section" id="section-followup-config">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Follow-up Automático
+        </span>
+      </div>
+      <div class="form-section-body">
+        <div class="form-group mb-4">
+          <div class="toggle-wrapper">
+            <label class="toggle">
+              <input type="checkbox" id="cfg-followup-enabled">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Ativar follow-up automático</span>
+          </div>
+          <span class="form-hint" style="margin-top:6px;">Envia mensagens automáticas com cupons para clientes que não compraram</span>
+        </div>
+
+        <div id="followup-fields">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Horas após último contato para iniciar</label>
+              <input type="number" id="cfg-followup-hours" class="form-control" placeholder="24" min="1" max="720">
+              <span class="form-hint">Mínimo de horas sem interação antes de enviar follow-up</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Dias sem compra para enviar cupom</label>
+              <input type="number" id="cfg-followup-days" class="form-control" placeholder="7" min="1" max="365">
+              <span class="form-hint">Número de dias sem compra para acionar o cupom</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Desconto do cupom (%)</label>
+              <input type="number" id="cfg-followup-discount" class="form-control" placeholder="10" min="1" max="100">
+              <span class="form-hint">Porcentagem de desconto a oferecer</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Validade do cupom (dias)</label>
+              <input type="number" id="cfg-followup-expiry" class="form-control" placeholder="3" min="1" max="30">
+              <span class="form-hint">Em quantos dias o cupom expira</span>
+            </div>
+            <div class="form-group form-grid-full">
+              <label class="form-label">Template da mensagem</label>
+              <textarea id="cfg-followup-template" class="form-control" rows="4"
+                placeholder="Oi {nome}! Temos uma oferta especial para você: use o cupom {cupom} e ganhe {desconto}% de desconto. Válido por {validade} dias! 🛍️"></textarea>
+              <span class="form-hint">Variáveis disponíveis: <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;">{nome}</code> <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;">{desconto}</code> <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;">{cupom}</code> <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;">{validade}</code></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Horário de início dos envios</label>
+              <input type="time" id="cfg-followup-time-start" class="form-control" value="09:00">
+              <span class="form-hint">Não envia mensagens antes deste horário</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Horário de fim dos envios</label>
+              <input type="time" id="cfg-followup-time-end" class="form-control" value="20:00">
+              <span class="form-hint">Não envia mensagens após este horário</span>
+            </div>
+            <div class="form-group form-grid-full">
+              <label class="form-label">Dias da semana permitidos</label>
+              <div class="checkbox-group">
+                ${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map((d, i) => `
+                  <label class="checkbox-item">
+                    <input type="checkbox" name="followup-days" value="${i+1}" ${i < 5 ? 'checked' : ''}>
+                    ${d}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('followup')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('followup')">Salvar Follow-up</button>
+      </div>
+    </div>
+
+    <!-- 2.6 SEGURANÇA -->
+    <div class="form-section" id="section-security">
+      <div class="form-section-header">
+        <span class="form-section-title">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Segurança
+        </span>
+      </div>
+      <div class="form-section-body">
+        <div class="form-group mb-4">
+          <div class="toggle-wrapper">
+            <label class="toggle">
+              <input type="checkbox" id="cfg-sec-verify" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Exigir verificação para consulta de pedidos</span>
+          </div>
+          <span class="form-hint" style="margin-top:6px;">Quando ativado, o cliente precisa confirmar sua identidade antes de ver detalhes de pedidos</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Métodos de verificação aceitos</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" name="verify-methods" value="email" checked>
+              E-mail cadastrado
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="verify-methods" value="order_number" checked>
+              Número do pedido
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="verify-methods" value="name">
+              Nome completo
+            </label>
+          </div>
+          <span class="form-hint">Quais informações o cliente pode usar para se verificar</span>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-outline btn-sm" onclick="loadConfigSection('security')">Recarregar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSection('security')">Salvar Segurança</button>
+      </div>
+    </div>
+  `;
+
+  // Load saved config into form fields
+  loadAllConfigSections();
+}
+
+async function loadAllConfigSections() {
+  console.log('[Config] Carregando todas as seções de configuração...');
+  await Promise.all([
+    loadConfigSection('identity'),
+    loadConfigSection('shopify'),
+    loadConfigSection('evolution'),
+    loadConfigSection('ai'),
+    loadConfigSection('followup'),
+    loadConfigSection('security'),
+  ]);
+}
+
+async function loadConfigSection(section) {
+  console.log(`[Config] Carregando seção: ${section}`);
+  try {
+    switch (section) {
+      case 'identity': {
+        const d = await apiRequest('GET', '/agent-config/identity');
+        if (!d) break;
+        setFieldValue('cfg-agent-name', d.agent_name || d.name || '');
+        setFieldValue('cfg-store-name', d.store_name || '');
+        setFieldValue('cfg-personality', d.personality || '');
+        break;
+      }
+      case 'shopify': {
+        const d = await apiRequest('GET', '/agent-config/shopify');
+        if (!d) break;
+        setFieldValue('cfg-shop-url',   d.shop_url || d.store_url || '');
+        setFieldValue('cfg-shop-token', d.access_token ? '••••••••' : '');
+        if (d.connected) updateConnStatus('shopify-conn-status', 'ok');
+        break;
+      }
+      case 'evolution': {
+        const d = await apiRequest('GET', '/config/evolution');
+        if (!d) break;
+        setFieldValue('cfg-evo-url',      d.base_url || d.api_url || '');
+        setFieldValue('cfg-evo-key',      d.api_key ? '••••••••' : '');
+        setFieldValue('cfg-evo-instance', d.instance_name || '');
+        break;
+      }
+      case 'ai': {
+        const [llmD, promptD, ctxD] = await Promise.all([
+          apiRequest('GET', '/config/llm'),
+          apiRequest('GET', '/config/system-prompt'),
+          apiRequest('GET', '/config/product-context'),
+        ]);
+        if (llmD)    { setFieldValue('cfg-ai-model', llmD.model || ''); setSliderValue('cfg-ai-temp', llmD.temperature ?? 0.7); }
+        if (promptD) setFieldValue('cfg-system-prompt', promptD.system_prompt || '');
+        if (ctxD)    setFieldValue('cfg-product-context', ctxD.product_context || ctxD.context || '');
+        break;
+      }
+      case 'followup': {
+        const d = await apiRequest('GET', '/config/follow-up');
+        if (!d) break;
+        // Backend retorna {rules: [FollowUpRule]} — extrair primeira rule se existir
+        const rules = d.rules || [];
+        const hasRules = rules.length > 0;
+        const firstRule = hasRules ? rules[0] : {};
+        setCheckboxValue('cfg-followup-enabled', hasRules && firstRule.enabled !== false);
+        // Converter delay_value de volta para horas
+        const delayHours = firstRule.delay_unit === 'days'
+          ? (firstRule.delay_value || 1) * 24
+          : Math.round((firstRule.delay_value || 1440) / 60);
+        setFieldValue('cfg-followup-hours', String(delayHours || 24));
+        setFieldValue('cfg-followup-template', firstRule.message || '');
+        setFieldValue('cfg-followup-time-start', firstRule.start_time || '09:00');
+        setFieldValue('cfg-followup-time-end',   firstRule.end_time   || '20:00');
+        break;
+      }
+      case 'security': {
+        const d = await apiRequest('GET', '/agent-config/security');
+        if (!d) break;
+        setCheckboxValue('cfg-sec-verify', d.require_verification !== false);
+        break;
+      }
+    }
+    console.log(`[Config] Seção ${section} carregada com sucesso`);
+  } catch (err) {
+    console.warn(`[Config] Não foi possível carregar seção ${section}:`, err.message);
+    // Silent fail — fields stay at their default values
+  }
+}
+
+function setFieldValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value;
+}
+
+function setCheckboxValue(id, checked) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!checked;
+}
+
+function setSliderValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+  }
+}
+
+function updateConnStatus(id, status) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `conn-status ${status}`;
+  el.textContent = status === 'ok' ? '✓ Conectado' : status === 'fail' ? '✗ Falhou' : 'Verificando...';
+}
+
+async function testShopifyConnection() {
+  console.log('[Config] Testando conexão Shopify...');
+  updateConnStatus('shopify-conn-status', 'checking');
+  try {
+    const data = await apiRequest('GET', '/health/shopify');
+    const ok = data && (data.status === 'ok' || data.connected === true);
+    updateConnStatus('shopify-conn-status', ok ? 'ok' : 'fail');
+    showToast(ok ? 'Shopify conectado com sucesso!' : 'Shopify offline ou credenciais inválidas', ok ? 'success' : 'error');
+  } catch {
+    updateConnStatus('shopify-conn-status', 'fail');
+    showToast('Erro ao conectar com Shopify', 'error');
+  }
+}
+
+async function testEvolutionConnection() {
+  console.log('[Config] Testando conexão Evolution API...');
+  updateConnStatus('evolution-conn-status', 'checking');
+  try {
+    const data = await apiRequest('GET', '/health/evolution');
+    const ok = data && (data.status === 'ok' || data.connected === true || data.state === 'open');
+    updateConnStatus('evolution-conn-status', ok ? 'ok' : 'fail');
+    showToast(ok ? 'WhatsApp conectado com sucesso!' : 'Evolution API offline ou credenciais inválidas', ok ? 'success' : 'error');
+  } catch {
+    updateConnStatus('evolution-conn-status', 'fail');
+    showToast('Erro ao conectar com Evolution API', 'error');
+  }
+}
+
+async function fetchQRCode() {
+  console.log('[Config] Buscando QR Code do WhatsApp...');
+  const qrArea = document.getElementById('qr-area');
+  if (!qrArea) return;
+  qrArea.innerHTML = '<div class="loading-center" style="padding:20px;"><div class="spinner"></div> Gerando QR Code...</div>';
+
+  try {
+    const data = await apiRequest('GET', '/evolution/qr-code');
+    if (data && data.qr_code) {
+      qrArea.innerHTML = `
+        <p style="margin-bottom:12px;font-size:13px;">Escaneie o QR Code com o WhatsApp:</p>
+        <img src="${data.qr_code}" alt="QR Code WhatsApp" style="max-width:220px;border-radius:12px;border:2px solid var(--border);">
+        <p style="margin-top:10px;font-size:11px;color:var(--muted);">O código expira em 60 segundos</p>
+        <button class="btn btn-sm btn-outline" style="margin-top:12px;" onclick="fetchQRCode()">Atualizar QR Code</button>
+      `;
+    } else {
+      qrArea.innerHTML = `<p style="color:var(--muted);">QR Code não disponível. WhatsApp pode já estar conectado.</p><button class="btn btn-sm btn-outline" style="margin-top:12px;" onclick="fetchQRCode()">Tentar novamente</button>`;
+    }
+  } catch (err) {
+    qrArea.innerHTML = `<p style="color:var(--error);">Erro ao buscar QR Code: ${err.message}</p><button class="btn btn-sm btn-outline" style="margin-top:12px;" onclick="fetchQRCode()">Tentar novamente</button>`;
+  }
+}
+
+async function saveSection(section) {
+  console.log(`[Config] Salvando seção: ${section}`);
+  const btn = event.currentTarget;
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Salvando...';
+
+  try {
+    switch (section) {
+      case 'identity': {
+        await apiRequest('POST', '/agent-config/identity', {
+          agent_name:   document.getElementById('cfg-agent-name').value.trim(),
+          store_name:   document.getElementById('cfg-store-name').value.trim(),
+          personality:  document.getElementById('cfg-personality').value.trim(),
+        });
+        break;
+      }
+      case 'shopify': {
+        const token = document.getElementById('cfg-shop-token').value;
+        const payload = { shop_url: document.getElementById('cfg-shop-url').value.trim() };
+        if (!token.includes('•')) payload.access_token = token;
+        await apiRequest('POST', '/agent-config/shopify', payload);
+        break;
+      }
+      case 'evolution': {
+        const apiKey = document.getElementById('cfg-evo-key').value;
+        const evoUrl = document.getElementById('cfg-evo-url').value.trim();
+        const evoInstance = document.getElementById('cfg-evo-instance').value.trim();
+        // Salvar via agent-config (aceita campos parciais)
+        const evoPayload = {
+          evolution_api_url: evoUrl,
+          evolution_instance_name: evoInstance,
+        };
+        if (!apiKey.includes('•') && apiKey) evoPayload.evolution_api_key = apiKey;
+        await apiRequest('PUT', '/agent-config/evolution', evoPayload);
+        break;
+      }
+      case 'ai': {
+        await Promise.all([
+          apiRequest('POST', '/config/llm', {
+            llm_model_preference: document.getElementById('cfg-ai-model').value,
+            llm_temperature:      parseFloat(document.getElementById('cfg-ai-temp').value),
+          }),
+          apiRequest('POST', '/config/system-prompt', {
+            system_prompt: document.getElementById('cfg-system-prompt').value.trim(),
+          }),
+          (document.getElementById('cfg-product-context').value.trim()
+            ? apiRequest('POST', '/config/product-context', {
+                context: document.getElementById('cfg-product-context').value.trim(),
+              })
+            : Promise.resolve()),
+        ]);
+        break;
+      }
+      case 'followup': {
+        const fEnabled = document.getElementById('cfg-followup-enabled')?.checked || false;
+        const fHoursRaw = document.getElementById('cfg-followup-hours')?.value;
+        const fHours = parseInt(fHoursRaw) || 24;
+        const fTemplateEl = document.getElementById('cfg-followup-template');
+        const fTemplate = (fTemplateEl?.value || '').trim();
+        const fMessage = fTemplate || 'Oi! Vi que voce se interessou pelos nossos produtos. Posso te ajudar com algo?';
+        const fStart = document.getElementById('cfg-followup-time-start')?.value || '09:00';
+        const fEnd = document.getElementById('cfg-followup-time-end')?.value || '20:00';
+
+        // Converter formato do formulario para rules do backend
+        const delayDays = Math.max(1, Math.floor(fHours / 24));
+        const rules = fEnabled ? [{
+          stage: 1,
+          delay_value: fHours >= 24 ? delayDays : fHours * 60,
+          delay_unit: fHours >= 24 ? 'days' : 'minutes',
+          start_time: fStart,
+          end_time: fEnd,
+          message: fMessage,
+          enabled: true,
+        }] : [];
+
+        await apiRequest('POST', '/config/follow-up', { rules });
+        break;
+      }
+      case 'security': {
+        const methods = [...document.querySelectorAll('input[name="verify-methods"]:checked')].map(el => el.value);
+        await apiRequest('POST', '/agent-config/security', {
+          require_verification:      document.getElementById('cfg-sec-verify').checked,
+          verification_methods:      methods,
+        });
+        break;
+      }
+    }
+    showToast('Configurações salvas com sucesso!', 'success');
+    console.log(`[Config] Seção ${section} salva com sucesso`);
+  } catch (err) {
+    console.error(`[Config] Erro ao salvar seção ${section}:`, err.message);
+    showToast(`Erro ao salvar: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// -------------------------------------------------------
+// PAGE: CONVERSAS
+// -------------------------------------------------------
+async function renderConversas(container) {
+  console.log('[Conversas] Renderizando página...');
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">Conversas</h1>
+      <p class="page-desc">Histórico completo de clientes e prospects atendidos.</p>
+    </div>
+
+    <div class="card mb-6">
+      <div class="card-header">
+        <span class="card-title">Buscar conversa</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 160px;gap:12px;align-items:end;">
+          <div class="form-group">
+            <input type="text" id="conv-search" class="form-control" placeholder="Buscar por nome ou número..." oninput="filterConversas()">
+          </div>
+          <select id="conv-filter" class="form-control" onchange="filterConversas()">
+            <option value="">Todos os status</option>
+            <option value="active">Ativos</option>
+            <option value="converted">Convertidos</option>
+            <option value="lost">Perdidos</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body" style="padding:0;">
+        <div id="conversas-list" class="conv-list">
+          <div class="loading-center"><div class="spinner"></div> <span>Carregando conversas...</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  loadConversas();
+}
+
+let allConversas = [];
+
+async function loadConversas() {
+  console.log('[Conversas] Carregando lista completa...');
+  const container = document.getElementById('conversas-list');
+  if (!container) return;
+
+  try {
+    const data = await apiRequest('GET', '/prospects?limit=50');
+    allConversas = data?.prospects || data?.items || data?.data || [];
+    console.log(`[Conversas] ${allConversas.length} conversas carregadas`);
+    renderConvList(allConversas);
+  } catch (err) {
+    console.error('[Conversas] Erro ao carregar:', err.message);
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <h3>Erro ao carregar conversas</h3>
+        <p>${err.message}</p>
+      </div>`;
+  }
+}
+
+function filterConversas() {
+  const search = document.getElementById('conv-search')?.value.toLowerCase() || '';
+  const filter = document.getElementById('conv-filter')?.value || '';
+  const filtered = allConversas.filter(p => {
+    const name  = (p.name || p.phone_number || '').toLowerCase();
+    const matchSearch = !search || name.includes(search);
+    const matchFilter = !filter || p.status === filter || p.stage === filter;
+    return matchSearch && matchFilter;
+  });
+  renderConvList(filtered);
+}
+
+function renderConvList(items) {
+  const container = document.getElementById('conversas-list');
+  if (!container) return;
+
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <h3>Nenhuma conversa encontrada</h3>
+        <p>Tente outros filtros ou aguarde as primeiras interações.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(p => {
+    const name     = p.name || p.phone_number || p.jid || 'Desconhecido';
+    const initials = name.charAt(0).toUpperCase();
+    const preview  = p.last_message || 'Sem mensagem recente';
+    const time     = p.last_interaction
+      ? new Date(p.last_interaction).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '–';
+    const statusBadge = p.status === 'converted'
+      ? '<span class="badge badge-success">Convertido</span>'
+      : p.status === 'lost'
+        ? '<span class="badge badge-error">Perdido</span>'
+        : '<span class="badge badge-muted">Ativo</span>';
+
+    return `
+      <div class="conv-item" onclick="openConvHistory('${p.jid || p.id || p.phone_number}', '${name.replace(/'/g,"\\'")}')">
+        <div class="conv-avatar">${initials}</div>
+        <div class="conv-info">
+          <div class="conv-name" style="display:flex;align-items:center;gap:8px;">${name} ${statusBadge}</div>
+          <div class="conv-preview">${preview.substring(0, 80)}</div>
+        </div>
+        <div class="conv-meta" style="text-align:right;min-width:80px;">
+          <div style="font-size:11px;color:var(--muted);">${time}</div>
+          ${p.message_count ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${p.message_count} msgs</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function openConvHistory(jid, name) {
+  console.log(`[Conversas] Abrindo histórico de: ${jid} (${name})`);
+  document.getElementById('conv-modal-title').textContent = `Conversa — ${name}`;
+  document.getElementById('conv-modal-body').innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+  openModal('conv-modal');
+
+  try {
+    const data = await apiRequest('GET', `/prospects/${jid}/history`);
+    const messages = data?.history || data?.messages || [];
+
+    if (!messages.length) {
+      document.getElementById('conv-modal-body').innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <h3>Sem histórico ainda</h3>
+          <p>Este contato ainda não enviou mensagens.</p>
+        </div>`;
+      return;
+    }
+
+    document.getElementById('conv-modal-body').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${messages.map(msg => {
+          const isAgent = msg.sender === 'agent' || msg.sender === 'bot' || msg.from_bot;
+          const time = msg.timestamp ? new Date(msg.timestamp).toLocaleString('pt-BR') : '';
+          return `
+            <div style="display:flex;flex-direction:column;align-items:${isAgent ? 'flex-end' : 'flex-start'};">
+              <div style="
+                max-width:80%;
+                background:${isAgent ? 'rgba(208,255,89,0.12)' : 'rgba(255,255,255,0.06)'};
+                border:1px solid ${isAgent ? 'rgba(208,255,89,0.2)' : 'var(--border)'};
+                border-radius:14px;
+                padding:10px 14px;
+                font-size:13px;
+              ">${msg.content || msg.message || msg.text || ''}</div>
+              <span style="font-size:10px;color:var(--muted);margin-top:3px;padding:0 4px;">${isAgent ? 'Atendente' : 'Cliente'} · ${time}</span>
+            </div>`;
+        }).join('')}
+      </div>`;
+    console.log(`[Conversas] ${messages.length} mensagens carregadas para ${jid}`);
+  } catch (err) {
+    console.error('[Conversas] Erro ao carregar histórico:', err.message);
+    document.getElementById('conv-modal-body').innerHTML = `<p style="color:var(--error);">Erro: ${err.message}</p>`;
+  }
+}
+
+// -------------------------------------------------------
+// PAGE: FOLLOW-UP
+// -------------------------------------------------------
+async function renderFollowup(container) {
+  console.log('[Followup] Renderizando página...');
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">Follow-up</h1>
+      <p class="page-desc">Acompanhe os envios automáticos de cupons e reengajamento.</p>
+    </div>
+
+    <div class="stats-grid mb-6" id="followup-stats">
+      <div class="stat-card stat-cta">
+        <span class="stat-label">Enviados</span>
+        <span class="stat-value" id="fu-sent">—</span>
+        <span class="stat-delta">Total geral</span>
+      </div>
+      <div class="stat-card stat-blue">
+        <span class="stat-label">Convertidos</span>
+        <span class="stat-value" id="fu-converted">—</span>
+        <span class="stat-delta">Compraram após follow-up</span>
+      </div>
+      <div class="stat-card stat-white">
+        <span class="stat-label">Taxa de conversão</span>
+        <span class="stat-value" id="fu-rate">—</span>
+        <span class="stat-delta">Follow-up → compra</span>
+      </div>
+      <div class="stat-card stat-pink">
+        <span class="stat-label">Receita gerada</span>
+        <span class="stat-value" id="fu-revenue">—</span>
+        <span class="stat-delta">Por follow-ups</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Histórico de Follow-ups</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="fu-filter" class="form-control" style="border-radius:9999px;padding:6px 14px;font-size:12px;width:auto;" onchange="filterFollowupHistory()">
+            <option value="">Todos</option>
+            <option value="sent">Enviado</option>
+            <option value="converted">Convertido</option>
+            <option value="failed">Falhou</option>
+          </select>
+          <button class="btn btn-sm btn-outline" onclick="loadFollowupHistory()">Atualizar</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrapper" style="border:none;border-radius:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Cupom</th>
+                <th>Desconto</th>
+                <th>Enviado em</th>
+                <th>Status</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="followup-table-body">
+              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">
+                <div class="spinner" style="margin:0 auto 12px;"></div>
+                Carregando histórico...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:20px;">
+      <button class="btn btn-outline" onclick="pauseFollowupScheduler()" id="fu-pause-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Pausar envios
+      </button>
+      <button class="btn btn-outline" onclick="resumeFollowupScheduler()" id="fu-resume-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Retomar envios
+      </button>
+    </div>
+  `;
+
+  loadFollowupStats();
+  loadFollowupHistory();
+}
+
+let allFollowups = [];
+
+async function loadFollowupStats() {
+  console.log('[Followup] Carregando estatísticas...');
+  try {
+    const data = await apiRequest('GET', '/followup/stats');
+    if (!data) return;
+    document.getElementById('fu-sent').textContent      = data.total_sent      ?? data.sent      ?? '0';
+    document.getElementById('fu-converted').textContent = data.total_converted ?? data.converted ?? '0';
+    document.getElementById('fu-rate').textContent      = data.conversion_rate ? `${data.conversion_rate}%` : '0%';
+    document.getElementById('fu-revenue').textContent   = data.revenue_generated
+      ? `R$ ${Number(data.revenue_generated).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`
+      : 'R$ 0';
+    console.log('[Followup] Stats carregadas:', data);
+  } catch (err) {
+    console.warn('[Followup] Não foi possível carregar stats:', err.message);
+  }
+}
+
+async function loadFollowupHistory() {
+  console.log('[Followup] Carregando histórico...');
+  const tbody = document.getElementById('followup-table-body');
+  if (!tbody) return;
+
+  try {
+    const data = await apiRequest('GET', '/followup/history?limit=50');
+    allFollowups = data?.history || data?.items || data?.data || [];
+    console.log(`[Followup] ${allFollowups.length} registros carregados`);
+    renderFollowupTable(allFollowups);
+  } catch (err) {
+    console.error('[Followup] Erro ao carregar histórico:', err.message);
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--error);">Erro: ${err.message}</td></tr>`;
+  }
+}
+
+function filterFollowupHistory() {
+  const filter = document.getElementById('fu-filter')?.value || '';
+  const filtered = filter ? allFollowups.filter(f => f.status === filter) : allFollowups;
+  renderFollowupTable(filtered);
+}
+
+function renderFollowupTable(items) {
+  const tbody = document.getElementById('followup-table-body');
+  if (!tbody) return;
+
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr><td colspan="6" style="text-align:center;padding:48px;color:var(--muted);">
+        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        Nenhum follow-up registrado ainda
+      </td></tr>`;
+    return;
+  }
+
+  const statusMap = {
+    sent:      '<span class="badge badge-cta">Enviado</span>',
+    converted: '<span class="badge badge-success">Convertido</span>',
+    failed:    '<span class="badge badge-error">Falhou</span>',
+    pending:   '<span class="badge badge-muted">Pendente</span>',
+    opened:    '<span class="badge badge-warning">Abriu</span>',
+  };
+
+  tbody.innerHTML = items.map(f => {
+    const name     = f.customer_name || f.prospect_name || f.name || f.phone || '—';
+    const coupon   = f.coupon_code || f.coupon || '—';
+    const discount = f.discount_percent ? `${f.discount_percent}%` : '—';
+    const sentAt   = f.sent_at || f.created_at
+      ? new Date(f.sent_at || f.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '—';
+    const status   = statusMap[f.status] || `<span class="badge badge-muted">${f.status || '—'}</span>`;
+
+    return `
+      <tr>
+        <td>${name}</td>
+        <td><code style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:6px;font-size:12px;">${coupon}</code></td>
+        <td>${discount}</td>
+        <td style="color:var(--muted);">${sentAt}</td>
+        <td>${status}</td>
+        <td>
+          <button class="btn btn-sm btn-outline" onclick="viewFollowupDetail('${f.id || f._id || ''}')" style="padding:4px 10px;font-size:11px;">
+            Detalhes
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function viewFollowupDetail(id) {
+  if (!id) return;
+  console.log(`[Followup] Visualizando detalhe ID: ${id}`);
+  showToast('Carregando detalhes...', 'info', 2000);
+}
+
+async function pauseFollowupScheduler() {
+  console.log('[Followup] Pausando scheduler...');
+  try {
+    await apiRequest('POST', '/followup/pause');
+    showToast('Envios de follow-up pausados', 'info');
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
+async function resumeFollowupScheduler() {
+  console.log('[Followup] Retomando scheduler...');
+  try {
+    await apiRequest('POST', '/followup/resume');
+    showToast('Envios de follow-up retomados', 'success');
+  } catch (err) {
+    showToast(`Erro: ${err.message}`, 'error');
+  }
+}
+
+// -------------------------------------------------------
+// BOOTSTRAP
+// -------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[App] DOM carregado. Verificando autenticação...');
+
+  const token = getToken();
+  if (token) {
+    STATE.token = token;
+    console.log('[App] Token encontrado — exibindo app');
+    showApp();
+    initApp();
+  } else {
+    console.log('[App] Sem token — exibindo login');
+    showLogin();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+# Configuração Dinâmica do Sistema LLM
+# Este arquivo permite ajustes avançados sem modificar código
+
+# Configurações Gerais
+general:
+  version: "2.1.0"
+  description: "WhatsApp AI Prospecting Agent - Enhanced with OpenRouter"
+  environment: "production"  # development, staging, production
+
+# Configurações de Modelos por Contexto
+models:
+  conversation:
+    primary: "anthropic/claude-3.5-haiku"
+    fallbacks:
+      - "anthropic/claude-3.5-sonnet"
+      - "openai/gpt-4o"
+    temperature: 0.7
+    max_tokens: 4096
+
+  scheduling:
+    primary: "anthropic/claude-3.5-haiku"
+    fallbacks:
+      - "openai/gpt-4o"
+      - "google/gemini-2.5-flash"
+    temperature: 0.5  # Mais determinístico para agendamentos
+    max_tokens: 2048
+
+  formatting:
+    primary: "anthropic/claude-3.5-haiku"
+    fallbacks:
+      - "anthropic/claude-3.5-haiku"
+      - "openai/gpt-4o-mini"
+    temperature: 0.3  # Muito determinístico para formatação
+    max_tokens: 1024
+
+# Configurações de Provider Routing
+provider_routing:
+  default_sort: "throughput"  # price, throughput, latency
+  allow_fallbacks: true
+  require_parameters: true
+  data_collection: "deny"  # allow, deny
+  
+  # Configurações específicas por tarefa
+  conversation:
+    sort: "throughput"
+    max_price:
+      prompt: 10.0    # $10/1M tokens
+      completion: 30.0  # $30/1M tokens
+    ignore_providers: []
+    
+  scheduling:
+    sort: "latency"  # Priorizar velocidade para agendamentos
+    max_price:
+      prompt: 5.0
+      completion: 15.0
+    ignore_providers: []
+    
+  formatting:
+    sort: "price"  # Priorizar custo para formatação simples
+    max_price:
+      prompt: 1.0
+      completion: 3.0
+    ignore_providers: ["Azure"]  # Exemplo de provider ignorado
+
+# Configurações de Cache
+cache:
+  enabled: true
+  ttl_seconds: 3600  # 1 hora
+  max_entries: 10000
+  exclude_tools: true  # Não cachear respostas que usaram tools
+  
+  # Configurações específicas por tipo
+  conversation_ttl: 3600
+  scheduling_ttl: 1800  # 30 minutos para agendamentos
+  formatting_ttl: 7200  # 2 horas para formatação
+
+# Configurações de Rate Limiting
+rate_limiting:
+  enabled: true
+  requests_per_minute: 60
+  burst_limit: 10
+  
+  # Configurações por contexto
+  conversation:
+    requests_per_minute: 45
+    burst_limit: 8
+    
+  scheduling:
+    requests_per_minute: 30  # Mais restritivo para agendamentos
+    burst_limit: 5
+    
+  formatting:
+    requests_per_minute: 100  # Menos restritivo para formatação
+    burst_limit: 15
+
+# Configurações de Circuit Breaker
+circuit_breaker:
+  enabled: true
+  failure_threshold: 5
+  timeout_seconds: 60
+  half_open_max_calls: 3
+  
+  # Por provider (opcional)
+  providers:
+    openai:
+      failure_threshold: 3
+      timeout_seconds: 30
+    anthropic:
+      failure_threshold: 5
+      timeout_seconds: 60
+
+# Configurações de Retry
+retry:
+  enabled: true
+  max_attempts: 3
+  base_delay: 1.0
+  max_delay: 60.0
+  backoff_factor: 2.0
+  
+  # Retry específico por erro
+  rate_limit_retry:
+    max_attempts: 5
+    base_delay: 2.0
+    max_delay: 120.0
+
+# Configurações de Streaming
+streaming:
+  enabled: false  # Padrão desabilitado para compatibilidade
+  buffer_size: 1024
+  timeout_seconds: 300
+  
+  # Habilitação por contexto
+  contexts:
+    conversation: false
+    scheduling: false
+    formatting: false
+
+# Configurações de Tools
+tools:
+  fetch_available_slots:
+    timeout_seconds: 30
+    retry_attempts: 2
+    cache_ttl: 300  # 5 minutos
+    
+  schedule_meeting_via_api:
+    timeout_seconds: 45
+    retry_attempts: 3
+    validation_strict: true
+
+# Configurações de Monitoring
+monitoring:
+  enabled: true
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  
+  metrics:
+    track_costs: true
+    track_response_times: true
+    track_model_usage: true
+    track_cache_hit_rate: true
+    
+  alerts:
+    high_cost_threshold: 10.0  # $10 por hora
+    slow_response_threshold: 30.0  # 30 segundos
+    error_rate_threshold: 0.05  # 5%
+
+# Configurações de Headers OpenRouter
+headers:
+  http_referer: "${SITE_URL}"
+  x_title: "${SITE_NAME}"
+  x_description: "WhatsApp AI Prospecting Agent"
+  user_agent: "InnovaFluxo/${APP_VERSION}"
+  x_app_version: "${APP_VERSION}"
+  
+  # Headers customizados (opcional)
+  custom:
+    x_environment: "${ENVIRONMENT}"
+    x_instance_id: "${INSTANCE_ID}"
+
+# Configurações de Prompts
+prompts:
+  system_prompt_templates:
+    conversation: |
+      Você é um assistente de vendas inteligente especializado em WhatsApp.
+      Seja natural, profissional e focado em ajudar o prospect.
+      NUNCA use listas numeradas (1. 2. 3.) - prefira texto fluido ou marcadores (•).
+
+    scheduling: |
+      Você é um assistente especializado em agendamento.
+      SEMPRE use as ferramentas obrigatórias antes de oferecer horários.
+      Seja preciso e eficiente no processo de agendamento.
+      NUNCA use listas numeradas - responda de forma natural e fluida.
+
+    formatting: |
+      Você é um assistente especializado em formatação de respostas.
+      Mantenha consistência e clareza nas respostas.
+      NUNCA use listas numeradas (1. 2. 3.) - use marcadores (•) ou texto corrido.
+
+# Configurações de Desenvolvimento/Debug
+development:
+  enabled: false
+  log_requests: false
+  log_responses: false
+  simulate_errors: false
+  mock_tools: false
+  
+# Configurações de Features Experimentais
+experimental:
+  enabled: false
+  features:
+    - "advanced_caching"
+    - "smart_model_selection"
+    - "predictive_prefetching"

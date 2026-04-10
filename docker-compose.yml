@@ -1,0 +1,55 @@
+version: '3.8'
+
+networks:
+  shopify-bot-network:
+    driver: bridge
+
+services:
+  app:
+    build: .
+    container_name: ${INSTANCE_ID}_app
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - shopify-bot-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  redis:
+    image: "redis:alpine"
+    container_name: ${INSTANCE_ID}_redis
+    restart: unless-stopped
+    networks:
+      - shopify-bot-network
+
+  db:
+    image: mysql:8.0
+    container_name: ${INSTANCE_ID}_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: shopify_bot
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shopify-bot-network
+
+volumes:
+  mysql_data:
