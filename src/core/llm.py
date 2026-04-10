@@ -520,7 +520,7 @@ class LLMManager:
                                         logger.warning(f"[{chat_id}] [LLM_SCHEDULE] Erro ao buscar sales_flow: {e_flow}")
 
                                     if prospect.stage < STAGE_AGENDADO:
-                                        logger.info(f"[{chat_id}] [LLM_SCHEDULE] 🔄 Atualizando estágio: {prospect.stage} → {STAGE_AGENDADO}")
+                                        logger.info(f"[{chat_id}] [LLM_SCHEDULE] 🔄 Atualizando estágio: {prospect.stage} -> {STAGE_AGENDADO}")
                                         await update_prospect_stage_state(chat_id, STAGE_AGENDADO, status='scheduled')
 
                                         # Verificar
@@ -1364,7 +1364,7 @@ Quando o cliente perguntar sobre algo que NÃO está no contexto acima (preço n
 - Cliente pergunta endereço/localização não informados
 
 ### EXCEÇÃO IMPORTANTE - NÃO USE [CONTEXTO_INSUFICIENTE] PARA:
-- Perguntas sobre agenda, horários disponíveis, agendamento → USE A FERRAMENTA fetch_available_slots
+- Perguntas sobre agenda, horários disponíveis, agendamento -> USE A FERRAMENTA fetch_available_slots
 - O horário de funcionamento está no contexto
 - Você TEM acesso à agenda real via a ferramenta fetch_available_slots
 
@@ -1453,8 +1453,8 @@ Para agendar reunião (após confirmar horário E ter email):
     "email": "joao@email.com"
   }
 - Seja MUITO atento: mesmo se o usuário mencionar dados casualmente, extraia-os.
-- Exemplo: "Oi, João Silva aqui, interessado no produto" → extrair nome "João Silva"
-- Exemplo: "Pode mandar mais info para maria@empresa.com?" → extrair email "maria@empresa.com"
+- Exemplo: "Oi, João Silva aqui, interessado no produto" -> extrair nome "João Silva"
+- Exemplo: "Pode mandar mais info para maria@empresa.com?" -> extrair email "maria@empresa.com"
 
 ### FORMATO DE RESPOSTA PADRÃO
 Para ações normais de conversa, responda com JSON:
@@ -1535,9 +1535,9 @@ PROIBIDO usar frases que indicam que você vai verificar algo e retornar depois,
 MOTIVO: Você é um assistente de atendimento IMEDIATO. Você DEVE responder no mesmo momento com a informação disponível.
 
 O QUE FAZER QUANDO NÃO TIVER A INFORMAÇÃO:
-1. Se a informação está no contexto → Responda diretamente com ela
-2. Se a informação NÃO está no contexto → Use [CONTEXTO_INSUFICIENTE] e ofereça alternativa imediata
-3. Se precisa usar uma ferramenta (agenda, etc.) → Use a ferramenta e responda com o resultado
+1. Se a informação está no contexto -> Responda diretamente com ela
+2. Se a informação NÃO está no contexto -> Use [CONTEXTO_INSUFICIENTE] e ofereça alternativa imediata
+3. Se precisa usar uma ferramenta (agenda, etc.) -> Use a ferramenta e responda com o resultado
 
 EXEMPLO DO QUE NÃO FAZER:
 ❌ "Vou verificar os horários disponíveis e já te retorno!"
@@ -1638,6 +1638,8 @@ Para solicitar data de nascimento:
 - Esses dados são essenciais para identificação do paciente no sistema da clínica
 - Mantenha tom profissional e acolhedor ao solicitar dados pessoais
 - Se o paciente questionar, explique que é necessário para confirmar o agendamento no sistema"""
+
+        base_prompt += '\n\n## CONSULTA DE PEDIDOS, RASTREIO E HISTORICO DE COMPRAS\n\nO cliente pode querer ver seus pedidos, rastrear entregas ou checar status. Use as acoes abaixo:\n\n### QUANDO USAR check_order_status\nSituacoes: "onde esta meu pedido", "status do #1001", "meu pedido foi entregue?", "pagamento aprovado?", "pedido cancelado?"\n\n```json\n{\n  "action": "check_order_status",\n  "arguments": {\n    "order_number": "#1001"\n  },\n  "text": "Vou verificar seu pedido agora!",\n  "reason": "Cliente quer saber o status do pedido"\n}\n```\n\nSe o cliente NAO informar o numero do pedido, use sem `order_number` (busca pelo telefone):\n```json\n{\n  "action": "check_order_status",\n  "arguments": {},\n  "text": "Vou buscar seus pedidos recentes!",\n  "reason": "Cliente quer status sem informar numero"\n}\n```\n\n### QUANDO USAR get_order_tracking\nSituacoes: "codigo de rastreio", "link de rastreamento", "onde esta minha encomenda", "numero de rastreio", "como rastrear meu pedido"\n\n```json\n{\n  "action": "get_order_tracking",\n  "arguments": {\n    "order_number": "#1001"\n  },\n  "text": "Vou buscar o codigo de rastreio agora!",\n  "reason": "Cliente quer rastrear o pedido"\n}\n```\n\nSe o cliente nao informar o numero, pergunte antes de usar a acao.\n\n### QUANDO USAR get_my_orders\nSituacoes: "meus pedidos", "historico de compras", "o que ja comprei", "ultimos pedidos", "ver todas as compras"\n\n```json\n{\n  "action": "get_my_orders",\n  "arguments": {\n    "limit": 5\n  },\n  "text": "Vou buscar seu historico de pedidos!",\n  "reason": "Cliente quer ver todos os pedidos"\n}\n```\n\n### FLUXO DE SEGURANCA (OBRIGATORIO)\n- Antes de mostrar dados de pedidos, o sistema exige verificacao de identidade automaticamente\n- Voce NAO precisa pedir verificacao manualmente - o sistema faz isso\n- Se o sistema pedir verificacao, aguarde o cliente fornecer email ou numero de pedido\n\n### REGRAS IMPORTANTES\n- Se cliente menciona "rastreio", "rastrear", "codigo de rastreio" -> use `get_order_tracking`\n- Se cliente quer ver TODOS os pedidos -> use `get_my_orders`\n- Se cliente quer STATUS de um pedido especifico -> use `check_order_status`\n- NUNCA invente status, codigo de rastreio ou informacoes de pedido\n- SEMPRE use as acoes acima para buscar dados reais da Shopify\n- NAO use [CONTEXTO_INSUFICIENTE] para perguntas sobre pedidos - voce tem acesso via ferramentas acima\n'
 
         # Adicionar prompt customizado se disponível
         if custom_system_prompt and custom_system_prompt.strip():

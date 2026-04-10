@@ -341,6 +341,7 @@ class ShopifyClient:
                         }}
                         fulfillments {{
                             status
+                            trackingCompany
                             trackingInfo {{
                                 number
                                 url
@@ -1120,6 +1121,28 @@ class ShopifyClient:
             f"{url_text}"
         )
 
+
+    def _build_tracking_url(self, tracking_number: str, tracking_url: str, carrier: str = "") -> str:
+        """Constrói URL de rastreio — usa URL da Shopify ou fallback por transportadora."""
+        if tracking_url:
+            return tracking_url
+        carrier_lower = (carrier or "").lower()
+        number = (tracking_number or "").strip()
+        if not number:
+            return ""
+        import re as _re
+        if "correio" in carrier_lower or _re.match(r"^[A-Z]{2}\d{9}[A-Z]{2}$", number):
+            return f"https://rastreamento.correios.com.br/app/index.php?objeto={number}"
+        if "jadlog" in carrier_lower:
+            return f"https://www.jadlog.com.br/rastreamento/tracking.jad?cte={number}"
+        if "total" in carrier_lower:
+            return f"https://www.totalexpress.com.br/rastreamento/{number}"
+        if "loggi" in carrier_lower:
+            return f"https://www.loggi.com/rastreamento/?q={number}"
+        if "melhor" in carrier_lower:
+            return f"https://melhorrastreio.com.br/rastreio/{number}"
+        return ""
+
     def format_order_for_chat(self, order: Dict) -> str:
         """Formata informações de pedido para envio via WhatsApp."""
         name = order.get("name", "N/A")
@@ -1197,8 +1220,67 @@ class ShopifyClient:
 # ─────────────────────────────────────────────
 # Funções globais (acessadas pelos outros módulos)
 # ─────────────────────────────────────────────
-def get_shopify_client() -> Optional[ShopifyClient]:
-    """Retorna a instância global do ShopifyClient."""
+async def get_order_tracking_for_chat(order_number: str) -> Optional[str]:
+    """Retorna informações de rastreio de um pedido específico."""
+    client = get_shopify_client()
+    if not client:
+        return None
+    order = await client.get_order_by_name(order_number)
+    if not order:
+        return None
+
+    fulfillments = order.get("fulfillments", [])
+    tracking_lines = []
+    for f in fulfillments:
+        carrier = f.get("trackingCompany", "")
+        for t in f.get("trackingInfo", []):
+            number = t.get("number", "")
+            url = t.get("url", "")
+            if number:
+                real_url = client._build_tracking_url(number, url, carrier)
+                line = (
+                    f"Pedido {order.get('name')}\n"
+                    f"Transportadora: {carrier or 'N/A'}\n"
+                    f"Codigo: {number}"
+                )
+                if real_url:
+                    line += "\nRastreie em: " + real_url
+                tracking_lines.append(line)
+
+    if tracking_lines:
+        return "\n\n".join(tracking_lines)
+
+    # Pedido existe mas sem rastreio ainda
+    status = order.get("displayFulfillmentStatus", "")
+    status_map = {
+        "UNFULFILLED": "ainda nao foi enviado - aguardando preparacao.",
+        "PARTIALLY_FULFILLED": "foi parcialmente enviado.",
+        "FULFILLED": "foi enviado mas sem código de rastreio disponível.",
+    }
+    msg = status_map.get(status, "está em processamento.")
+    return f"O pedido {order.get('name')} {msg}"
+
+
+async def get_all_customer_orders_for_chat(phone: str, limit: int = 5) -> Optional[str]:
+    client = get_shopify_client()
+    if not client: return None
+    orders = await client.get_orders_by_phone(phone, first=limit)
+    if not orders: return None
+    lines = ["Encontrei *" + str(len(orders)) + " pedido(s) recentes:"]
+    for o in orders:
+        name = o.get("name", "N/A")
+        fin = {"PAID":"Pago","PENDING":"Pendente","VOIDED":"Cancelado"}.get(o.get("displayFinancialStatus",""), o.get("displayFinancialStatus",""))
+        ful = {"FULFILLED":"Enviado","UNFULFILLED":"Aguardando","IN_TRANSIT":"Em transito","DELIVERED":"Entregue"}.get(o.get("displayFulfillmentStatus",""), o.get("displayFulfillmentStatus",""))
+        total = o.get("totalPriceSet", {}).get("shopMoney", {})
+        tv = "R$ {:.2f}".format(float(total.get("amount", 0)))
+        ht = any(t.get("number") for ff in o.get("fulfillments",[]) for t in ff.get("trackingInfo",[]))
+        hint = " (tem rastreio)" if ht else ""
+        lines.append("*" + name + "* | " + fin + "/" + ful + hint + " | " + tv)
+    return (chr(10) + chr(10)).join(lines)
+
+
+def get_shopify_client() -> Optional["ShopifyClient"]:
+    """Retorna a instancia global do cliente Shopify."""
     return _shopify_client
 
 

@@ -18,6 +18,8 @@ from src.core.shopify import (
     search_products_for_chat,
     get_order_status_for_chat,
     get_customer_orders_for_chat,
+    get_order_tracking_for_chat,
+    get_all_customer_orders_for_chat,
     generate_checkout_link,
     get_shopify_client,
     get_customer_context_for_llm,
@@ -483,6 +485,8 @@ async def _process_llm_response(prospect: ProspectState, response: Dict[str, Any
     tool_actions = {
         "search_products": _handle_search_products,
         "check_order_status": _handle_check_order,
+        "get_my_orders": _handle_get_my_orders,
+        "get_order_tracking": _handle_get_order_tracking,
         "verify_identity": _handle_verify_identity,
         "send_checkout_link": _handle_checkout_link,
         "get_popular_products": _handle_popular_products,
@@ -697,6 +701,46 @@ async def _handle_check_order(action_data: Dict, prospect: ProspectState):
                 await _send_text_message(phone, msg)
         else:
             await _send_text_message(phone, "Nao encontrei pedidos associados ao seu numero. Pode me informar o numero do pedido? (ex: #1001)")
+
+
+
+async def _handle_get_my_orders(action_data: Dict, prospect: ProspectState):
+    phone = prospect.jid
+    if not _is_customer_verified(phone):
+        msg = ("Para sua seguranca, confirme sua identidade antes de ver seus pedidos." + chr(10) +
+               "Me informe: *email* cadastrado ou *numero do pedido* (ex: #1001)")
+        await _send_text_message(phone, msg)
+        await add_message_to_history_state(phone, "system", "[SECURITY] Verificacao para pedidos", conversation_initiator_override=prospect.conversation_initiator)
+        return
+    limit = int(action_data.get("arguments", {}).get("limit", 5))
+    summary = await get_all_customer_orders_for_chat(phone, limit=limit)
+    if summary:
+        await _send_text_message(phone, summary)
+        await add_message_to_history_state(phone, "system", f"[SHOPIFY] Pedidos enviados ({limit})", conversation_initiator_override=prospect.conversation_initiator)
+    else:
+        await _send_text_message(phone, "Nao encontrei pedidos no seu numero. Me informe o numero do pedido (ex: #1001)!")
+
+
+
+async def _handle_get_order_tracking(action_data: Dict, prospect: ProspectState):
+    phone = prospect.jid
+    if not _is_customer_verified(phone):
+        msg = ("Para sua seguranca, confirme sua identidade antes de ver o rastreio." + chr(10) +
+               "Me informe: *email* cadastrado ou *numero do pedido* (ex: #1001)")
+        await _send_text_message(phone, msg)
+        await add_message_to_history_state(phone, "system", "[SECURITY] Verificacao para rastreio", conversation_initiator_override=prospect.conversation_initiator)
+        return
+    order_number = action_data.get("arguments", {}).get("order_number", action_data.get("arguments", {}).get("order_name", "")).strip()
+    if not order_number:
+        await _send_text_message(phone, "Qual o numero do pedido? Ex: *#1001*")
+        return
+    tracking_text = await get_order_tracking_for_chat(order_number)
+    if tracking_text:
+        await _send_text_message(phone, tracking_text)
+        await add_message_to_history_state(phone, "system", f"[SHOPIFY] Rastreio {order_number} enviado", conversation_initiator_override=prospect.conversation_initiator)
+    else:
+        await _send_text_message(phone, f"Nao encontrei o pedido *{order_number}*. Confere o numero!")
+
 
 
 async def _handle_checkout_link(action_data: Dict, prospect: ProspectState):
