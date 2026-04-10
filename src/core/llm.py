@@ -1696,15 +1696,14 @@ Para solicitar data de nascimento:
             '```json\n{"action": "get_business_hours", "arguments": {}, "text": "Veja nosso horário!", "reason": "Cliente quer saber horário"}\n```\n\n'
 
             '---\n### SEGURANÇA — VERIFICAÇÃO DE IDENTIDADE\n\n'
-            '**verify_identity** — OBRIGATÓRIO quando: o sistema pediu email/número de pedido E o cliente acabou de fornecer um desses dados como resposta. '
-            'Também usar quando cliente responde com email ou número de pedido sem contexto claro de outro pedido.\n'
-            '```json\n{"action": "verify_identity", "arguments": {"email": "cliente@email.com", "order_number": "#1001"}, "text": "Verificando sua identidade!", "reason": "Cliente forneceu dados de verificação"}\n```\n'
-            'Passe apenas os dados fornecidos (email, order_number e/ou name). Nunca invente dados.\n\n'
-            '**FLUXO CORRETO para consulta de pedido:**\n'
-            '1. Cliente pede status → chame `check_order_status`\n'
-            '2. Sistema solicita verificação automaticamente\n'
-            '3. Cliente responde com email/pedido → chame `verify_identity` com os dados fornecidos\n'
-            '4. Após verificação bem-sucedida → chame `check_order_status` novamente\n\n'
+            '**REGRA ABSOLUTA**: JAMAIS escreva qualquer mensagem de segurança/identidade como texto. Use SEMPRE as ações abaixo.\n\n'
+            '**PASSO 1 — Cliente quer status/rastreio de pedido:** chame `check_order_status` ou `get_order_tracking`. O backend envia a mensagem de segurança automaticamente.\n'
+            '```json\n{"action": "check_order_status", "arguments": {"order_number": "#1001"}, "text": "Vou verificar!", "reason": "Consulta de pedido"}\n```\n\n'
+            '**PASSO 2 — Cliente respondeu com email/número de pedido** (como resposta à verificação): chame IMEDIATAMENTE `verify_identity` com os dados fornecidos.\n'
+            '```json\n{"action": "verify_identity", "arguments": {"email": "cliente@email.com", "order_number": "#1001"}, "text": "Verificando!", "reason": "Cliente forneceu dados de verificação"}\n```\n'
+            'Passe SOMENTE os dados que o cliente realmente forneceu. Nunca invente.\n\n'
+            '**PASSO 3 — Após verify_identity bem-sucedido:** chame `check_order_status` novamente para mostrar o status.\n\n'
+            '**RECONHECER dados de verificação:** email (ex: algo@email.com) OU número de pedido (ex: #1001, 1001) = chamar `verify_identity`.\n\n'
 
             '### REGRAS GERAIS DE USO\n'
             '- Se cliente menciona "rastreio" → `get_order_tracking`\n'
@@ -1714,6 +1713,9 @@ Para solicitar data de nascimento:
             '- Se cliente pede endereço/contato/moeda/informações da loja → `get_shop_info`\n'
             '- NUNCA invente informações — sempre use as ferramentas para dados reais da Shopify\n'
             '- NAO use [CONTEXTO_INSUFICIENTE] para temas cobertos pelas ferramentas acima\n'
+            '- NUNCA gere manualmente a mensagem de verificação de identidade como texto — use sempre `check_order_status` ou `get_my_orders` e deixe o sistema tratar a segurança\n'
+            '- NUNCA escreva mensagens do tipo "Para sua segurança, preciso confirmar..." como texto — isso é gerado automaticamente pelo backend\n'
+            '- NUNCA peça email ou número de pedido via texto puro para fins de segurança — use a ação correta e o sistema fará isso\n'
         )
 
         # Adicionar prompt customizado se disponível
