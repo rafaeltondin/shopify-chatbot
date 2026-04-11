@@ -505,6 +505,11 @@ async def _process_message(phone_number: str, message_text: str, instance_id: st
                 logger.info(f"[{phone_number}] INTERCEPTAÇÃO: dados de verificação detectados na mensagem, chamando verify_identity diretamente. Dados: {verif_data}")
                 fake_action = {"action": "verify_identity", "arguments": verif_data}
                 await _handle_verify_identity(fake_action, prospect)
+                if _is_customer_verified(phone_number):
+                    order_number = verif_data.get("order_number", "")
+                    logger.info(f"[{phone_number}] Verificacao OK - consultando pedido automaticamente")
+                    chk = {"action": "check_order_status", "arguments": {"order_number": order_number} if order_number else {}}
+                    await _handle_check_order(chk, prospect)
                 return
         # ── FIM DA INTERCEPTAÇÃO ─────────────────────────────────────────────
 
