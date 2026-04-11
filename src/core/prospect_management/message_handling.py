@@ -531,8 +531,58 @@ async def _process_message(phone_number: str, message_text: str, instance_id: st
             await _send_text_message(phone_number, "Desculpe, não consegui processar sua mensagem. Pode tentar novamente?")
             return
 
-        # 6. Processar resposta + salvar interesses detectados
-        await _process_llm_response(prospect, llm_response)
+        # 6. ReAct loop: executar ferramentas sequencialmente antes de responder
+        agentic_messages = list(enriched_messages)
+        for step in range(MAX_TOOL_STEPS):
+            action_data = llm_response.get("action_data", {})
+            action = action_data.get("action", "send_text")
+
+            if action not in MULTI_STEP_TOOLS:
+                # Acao terminal (send_text, verify_identity, checkout, etc) — executar normalmente
+                await _process_llm_response(prospect, llm_response)
+                break
+
+            # Capturar resultado da ferramenta sem enviar ao usuario
+            tool_result = await _execute_tool_for_loop(action, action_data, prospect)
+
+            if tool_result is None:
+                # Ferramenta precisa de interacao com usuario (ex: verificacao) — fluxo normal
+                logger.info(f"[{phone_number}] [AGENTIC] Step {step+1}: '{action}' requer interacao, saindo do loop")
+                await _process_llm_response(prospect, llm_response)
+                break
+
+            logger.info(f"[{phone_number}] [AGENTIC] Step {step+1}/{MAX_TOOL_STEPS}: '{action}' executado ({len(tool_result)} chars). Reinjetando no LLM.")
+
+            # Injetar resultado no contexto
+            agent_text = action_data.get("text", "")
+            if agent_text:
+                agentic_messages.append({"role": "assistant", "content": agent_text})
+            agentic_messages.append({
+                "role": "system",
+                "content": f"[RESULTADO_FERRAMENTA: {action}]\n{tool_result}\n[FIM_RESULTADO]"
+            })
+
+            # Chamar LLM novamente com dados reais
+            llm_response = await llm.get_llm_response(
+                messages=agentic_messages,
+                task_type=TaskType.CONVERSATION,
+                chat_id=prospect.jid,
+                current_stage_definition={"objective": "Formular resposta final com base nos dados reais retornados pelas ferramentas"},
+                next_stage_definition=None,
+                prospect_name=prospect.name,
+                prospect_jid=prospect.jid,
+                conversation_initiator=prospect.conversation_initiator,
+                instance_id=prospect.instance_id,
+            )
+
+            if not llm_response or not llm_response.get("action_data"):
+                await _send_text_message(phone_number, "Desculpe, ocorreu um erro. Tente novamente.")
+                break
+        else:
+            # Estourou MAX_TOOL_STEPS — executar o que tiver
+            if llm_response and llm_response.get("action_data"):
+                logger.warning(f"[{phone_number}] [AGENTIC] Max steps atingido, forcando execucao final")
+                await _process_llm_response(prospect, llm_response)
 
     except Exception as e:
         logger.error(f"[{phone_number}] Erro no processamento: {e}", exc_info=True)
@@ -764,6 +814,124 @@ async def _handle_search_products(action_data: Dict, prospect: ProspectState):
             conversation_initiator_override=prospect.conversation_initiator,
         )
 
+
+
+# ── MULTI-STEP TOOL CALLING (ReAct loop) ─────────────────────────────────────
+MAX_TOOL_STEPS = 4  # Maximo de ferramentas encadeadas por turno
+
+# Ferramentas que operam em modo "coleta de dados" — resultado volta ao LLM
+MULTI_STEP_TOOLS = {
+    "search_products", "get_popular_products", "recommend_products",
+    "check_order_status", "get_my_orders", "get_order_tracking",
+    "check_stock", "get_store_policies", "get_business_hours", "get_shop_info",
+}
+
+
+async def _execute_tool_for_loop(action: str, action_data: Dict, prospect) -> Optional[str]:
+    """Executa ferramenta e retorna resultado como string (sem enviar ao usuario)."""
+    args = action_data.get("arguments", {})
+    phone = prospect.jid
+    try:
+        if action == "search_products":
+            query = args.get("query", "")
+            limit = min(int(args.get("limit", 5)), 8)
+            products = await search_products_for_chat(query, limit=limit)
+            if not products:
+                return f"Nenhum produto encontrado para '{query}'."
+            lines = [f"[{len(products)} produto(s) encontrado(s) para '{query}']"]
+            for p in products:
+                price = p.get("priceRange", {}).get("minVariantPrice", {}).get("amount", "?")
+                stock = p.get("totalInventory", 0)
+                url = p.get("onlineStoreUrl", "")
+                desc = (p.get("description") or "")[:150]
+                lines.append(f"- {p.get('title')} | R${price} | Estoque: {stock} | {url}")
+                if desc:
+                    lines.append(f"  {desc}")
+            return "\n".join(lines)
+
+        elif action == "get_popular_products":
+            limit = min(int(args.get("limit", 5)), 6)
+            products = await get_popular_products_for_chat(limit=limit)
+            if not products:
+                return "Nenhum produto popular disponivel."
+            lines = [f"[{len(products)} produto(s) popular(es)]"]
+            for p in products:
+                price = p.get("priceRange", {}).get("minVariantPrice", {}).get("amount", "?")
+                stock = p.get("totalInventory", 0)
+                url = p.get("onlineStoreUrl", "")
+                lines.append(f"- {p.get('title')} | R${price} | Estoque: {stock} | {url}")
+            return "\n".join(lines)
+
+        elif action == "recommend_products":
+            limit = min(int(args.get("limit", 5)), 6)
+            product_ids = args.get("product_ids", [])
+            products = await recommend_products_for_chat(product_ids, limit=limit) if product_ids else await get_popular_products_for_chat(limit=limit)
+            if not products:
+                return "Sem recomendacoes disponiveis."
+            lines = [f"[{len(products)} produto(s) recomendado(s)]"]
+            for p in products:
+                price = p.get("priceRange", {}).get("minVariantPrice", {}).get("amount", "?")
+                url = p.get("onlineStoreUrl", "")
+                lines.append(f"- {p.get('title')} | R${price} | {url}")
+            return "\n".join(lines)
+
+        elif action == "check_order_status":
+            if not _is_customer_verified(phone):
+                return None  # Precisa verificacao -- execucao normal
+            order_number = args.get("order_number", args.get("order_name", "")).strip()
+            if order_number:
+                result = await get_order_status_for_chat(order_number)
+                return result or f"Pedido {order_number} nao encontrado."
+            else:
+                orders = await get_customer_orders_for_chat(phone, limit=3)
+                return "\n\n".join(orders) if orders else "Nenhum pedido encontrado para este numero."
+
+        elif action == "get_my_orders":
+            if not _is_customer_verified(phone):
+                return None
+            limit = min(int(args.get("limit", 5)), 10)
+            result = await get_all_customer_orders_for_chat(phone, limit=limit)
+            return result or "Nenhum pedido encontrado."
+
+        elif action == "get_order_tracking":
+            if not _is_customer_verified(phone):
+                return None
+            order_number = args.get("order_number", args.get("order_name", "")).strip()
+            if not order_number:
+                return None
+            result = await get_order_tracking_for_chat(order_number)
+            return result or f"Sem rastreio para {order_number}."
+
+        elif action == "check_stock":
+            variant_id = args.get("variant_id", "")
+            if not variant_id:
+                return None
+            result = await check_stock_for_chat(variant_id)
+            return result or "Informacao de estoque indisponivel."
+
+        elif action == "get_store_policies":
+            policy_type = args.get("policy_type") or None
+            result = await get_store_policies_for_chat(policy_type)
+            return result or "Politicas nao disponiveis."
+
+        elif action == "get_business_hours":
+            client = get_shopify_client()
+            if not client:
+                return "Horario nao configurado."
+            info = await client.get_shop_info()
+            return client.format_shop_info_for_chat(info) if info else "Horario nao configurado."
+
+        elif action == "get_shop_info":
+            client = get_shopify_client()
+            if not client:
+                return "Informacoes da loja indisponiveis."
+            info = await client.get_shop_info()
+            return client.format_shop_info_for_chat(info) if info else "Informacoes indisponiveis."
+
+    except Exception as e:
+        logger.error(f"[{phone}] Erro ao capturar resultado de '{action}': {e}", exc_info=True)
+    return None
+# ── FIM MULTI-STEP TOOLS ──────────────────────────────────────────────────────
 
 async def _handle_check_order(action_data: Dict, prospect: ProspectState):
     """Consulta status de pedido — EXIGE verificação de identidade."""

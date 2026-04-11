@@ -1716,6 +1716,8 @@ Para solicitar data de nascimento:
             '- NUNCA gere manualmente a mensagem de verificação de identidade como texto — use sempre `check_order_status` ou `get_my_orders` e deixe o sistema tratar a segurança\n'
             '- NUNCA escreva mensagens do tipo "Para sua segurança, preciso confirmar..." como texto — isso é gerado automaticamente pelo backend\n'
             '- NUNCA peça email ou número de pedido via texto puro para fins de segurança — use a ação correta e o sistema fará isso\n'
+            '- ENCADEAMENTO DE FERRAMENTAS: quando voce chamar uma ferramenta, o resultado sera injetado no contexto com [RESULTADO_FERRAMENTA: X]. Use os dados para formular a resposta final com send_text. Voce pode encadear ate 4 ferramentas por turno.\n'
+            '- Apos receber [RESULTADO_FERRAMENTA: X], responda com send_text usando os dados — nao chame a mesma ferramenta de novo.\n'
         )
 
         # Adicionar prompt customizado se disponível
