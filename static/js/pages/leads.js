@@ -3,7 +3,7 @@
  * Página de Leads - Lista todos os leads que entraram em contato
  * Exibe nome, tags, última mensagem, status e outras informações
  */
-import { getLeadsList, getLeadsStats, getProspectHistory, getTagDefinitions } from '../api.js';
+import { getLeadsList, getLeadsStats, getProspectHistory, getTagDefinitions, toggleProspectLLMPause } from '../api.js';
 import { showFeedback, clearFeedback, setLoadingState, replaceFeatherIcons, showModal, hideModal } from '../utils.js';
 
 /**
@@ -367,6 +367,24 @@ function renderLeadsTable(leads) {
             openHistoryModal(jid, name);
         });
     });
+
+    tableContainer.querySelectorAll('.btn-toggle-pause').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const jid = btn.dataset.jid;
+            const currentlyPaused = btn.dataset.paused === 'true';
+            const newPausedState = !currentlyPaused;
+            btn.disabled = true;
+            try {
+                await toggleProspectLLMPause(jid, newPausedState);
+                showFeedback(newPausedState ? 'IA pausada para este lead' : 'IA retomada para este lead', 'success');
+                loadLeads();
+            } catch (err) {
+                console.error('Erro ao pausar/despausar:', err);
+                showFeedback('Erro ao alterar estado da IA: ' + (err.message || 'desconhecido'), 'error');
+                btn.disabled = false;
+            }
+        });
+    });
 }
 
 /**
@@ -453,6 +471,9 @@ function renderLeadRow(lead) {
                 <span class="text-muted">${lastInteraction}</span>
             </td>
             <td>
+                <button type="button" class="btn btn-ghost btn-sm btn-toggle-pause" data-jid="${lead.jid}" data-paused="${lead.llm_paused ? 'true' : 'false'}" title="${lead.llm_paused ? 'Despausar IA' : 'Pausar IA'}">
+                    <i data-feather="${lead.llm_paused ? 'play' : 'pause'}"></i>
+                </button>
                 <button type="button" class="btn btn-ghost btn-sm btn-view-history" data-jid="${lead.jid}" data-name="${lead.name || ''}" title="Ver histórico">
                     <i data-feather="message-square"></i>
                 </button>
