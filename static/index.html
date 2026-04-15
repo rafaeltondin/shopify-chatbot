@@ -1675,6 +1675,8 @@ function renderConfig(container) {
               <option value="google/gemini-2.0-flash-exp">Gemini 2.0 Flash (Google)</option>
               <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku (Rápido)</option>
               <option value="glm-4.7-flash">GLM 4.7 Flash (Alta performance)</option>
+              <option value="deepseek-chat">DeepSeek Chat (DeepSeek V3)</option>
+              <option value="deepseek-reasoner">DeepSeek Reasoner (R1)</option>
             </select>
             <span class="form-hint">Escolha o modelo de linguagem para o atendente</span>
           </div>
@@ -1870,7 +1872,7 @@ async function loadConfigSection(section) {
       case 'evolution': {
         const d = await apiRequest('GET', '/config/evolution');
         if (!d) break;
-        setFieldValue('cfg-evo-url',      d.base_url || d.api_url || '');
+        setFieldValue('cfg-evo-url',      d.url || d.base_url || d.api_url || '');
         setFieldValue('cfg-evo-key',      d.api_key ? '••••••••' : '');
         setFieldValue('cfg-evo-instance', d.instance_name || '');
         break;
@@ -1881,7 +1883,7 @@ async function loadConfigSection(section) {
           apiRequest('GET', '/config/system-prompt'),
           apiRequest('GET', '/config/product-context'),
         ]);
-        if (llmD)    { setFieldValue('cfg-ai-model', llmD.model || ''); setSliderValue('cfg-ai-temp', llmD.temperature ?? 0.7); }
+        if (llmD)    { setFieldValue('cfg-ai-model', llmD.llm_model_preference || llmD.model || ''); setSliderValue('cfg-ai-temp', llmD.llm_temperature ?? llmD.temperature ?? 0.7); }
         if (promptD) setFieldValue('cfg-system-prompt', promptD.system_prompt || '');
         if (ctxD)    setFieldValue('cfg-product-context', ctxD.product_context || ctxD.context || '');
         break;

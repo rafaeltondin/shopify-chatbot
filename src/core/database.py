@@ -340,6 +340,9 @@ async def initialize_database():
         await schema_management.add_column_if_not_exists(schema_cursor, db_name, 'prospects', 'total_spent', "DECIMAL(10, 2) NULL DEFAULT 0.00 COMMENT 'Total gasto pelo cliente na loja' AFTER last_order_id")
         # Quantidade de pedidos
         await schema_management.add_column_if_not_exists(schema_cursor, db_name, 'prospects', 'orders_count', "INT NULL DEFAULT 0 COMMENT 'Total de pedidos do cliente' AFTER total_spent")
+        await schema_management.add_column_if_not_exists(schema_cursor, db_name, 'prospects', 'cpf', "VARCHAR(20) NULL COMMENT 'CPF do cliente' AFTER orders_count")
+        await schema_management.add_column_if_not_exists(schema_cursor, db_name, 'prospects', 'full_name', "VARCHAR(255) NULL COMMENT 'Nome completo do cliente' AFTER cpf")
+        await schema_management.add_column_if_not_exists(schema_cursor, db_name, 'prospects', 'birth_date', "DATE NULL COMMENT 'Data de nascimento' AFTER full_name")
         logger.info("database.py: Columns 'email', 'shopify_customer_id', 'last_order_id', 'total_spent', 'orders_count' in 'prospects' table verified/created.")
         await schema_management.add_index_if_not_exists(schema_cursor, db_name, 'prospects', 'idx_instance_id', '(instance_id)')
         await schema_management.add_index_if_not_exists(schema_cursor, db_name, 'prospects', 'idx_prospect_initiator', '(instance_id, conversation_initiator)')
