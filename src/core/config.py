@@ -128,6 +128,12 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None  # Fallback para transcrição de áudio
     OPENROUTER_BASE_URL: str = 'https://openrouter.ai/api/v1'
 
+    # Whisper API local (faster-whisper + FastAPI rodando em host.docker.internal:8771)
+    # Usado como transcritor primário; OpenAI/Groq continuam como fallback.
+    WHISPER_API_ENABLED: bool = False
+    WHISPER_API_BASE_URL: Optional[str] = None  # Ex: http://host.docker.internal:8771/v1
+    WHISPER_API_MODEL: str = "whisper-large-v3-turbo"
+
     # DeepSeek — API direta (opcional, mais barato que OpenRouter)
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_BASE_URL: str = 'https://api.deepseek.com/v1'

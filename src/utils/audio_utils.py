@@ -77,6 +77,58 @@ async def _convert_audio_to_mp3(input_path: Path, output_dir: Path) -> Optional[
         logger.error(f"[CONVERT_AUDIO] Erro inesperado durante a conversão FFmpeg para '{input_path}': {e}", exc_info=True)
         return None
 
+async def _transcribe_with_local_whisper(audio_file_path: Path) -> Optional[str]:
+    """
+    Transcreve áudio usando a API local faster-whisper (compatível com OpenAI/Groq).
+
+    Configurada por settings.WHISPER_API_BASE_URL (ex: http://host.docker.internal:8771/v1).
+    Usada como transcritor PRIMÁRIO quando WHISPER_API_ENABLED=true.
+
+    Returns:
+        Texto transcrito ou None se falhar (dispara fallback pra OpenAI/Groq)
+    """
+    base_url = getattr(settings, "WHISPER_API_BASE_URL", None)
+    if not base_url:
+        return None
+
+    model_name = getattr(settings, "WHISPER_API_MODEL", "whisper-large-v3-turbo")
+    logger.info(f"[TRANSCRIBE_LOCAL] Tentando transcrição via API local ({base_url}) para: {audio_file_path.name}")
+    start_ts = time.monotonic()
+
+    try:
+        client = AsyncOpenAI(
+            base_url=base_url,
+            api_key="local-dummy",
+            timeout=180.0,
+            max_retries=0,
+        )
+        with open(audio_file_path, "rb") as audio_file_object:
+            logger.debug(f"[TRANSCRIBE_LOCAL] POST {base_url}/audio/transcriptions model={model_name} language=pt")
+            transcription_response = await client.audio.transcriptions.create(
+                model=model_name,
+                file=audio_file_object,
+                language="pt",
+                response_format="text",
+            )
+
+        elapsed_time = time.monotonic() - start_ts
+        transcription_text = transcription_response if isinstance(transcription_response, str) else ""
+
+        if not transcription_text.strip():
+            logger.warning(f"[TRANSCRIBE_LOCAL] Transcrição vazia após {elapsed_time:.2f}s")
+            return None
+
+        logger.info(f"[TRANSCRIBE_LOCAL] Sucesso em {elapsed_time:.2f}s. Texto: '{transcription_text[:100]}...'")
+        return transcription_text.strip()
+
+    except (APIConnectionError, OpenAIError) as e:
+        logger.warning(f"[TRANSCRIBE_LOCAL] Falha ao chamar API local ({type(e).__name__}): {e}. Indo pro fallback.")
+        return None
+    except Exception as e:
+        logger.error(f"[TRANSCRIBE_LOCAL] Erro inesperado: {e}", exc_info=True)
+        return None
+
+
 async def _transcribe_with_groq(audio_file_path: Path) -> Optional[str]:
     """
     Transcreve áudio usando a API do Groq (Whisper large-v3).
@@ -124,8 +176,11 @@ async def _transcribe_with_groq(audio_file_path: Path) -> Optional[str]:
 
 async def transcribe_audio(audio_path: str) -> str:
     """
-    Transcreve um arquivo de áudio usando o serviço Whisper da OpenAI.
-    Em caso de erro 429 (quota exceeded), usa Groq como fallback.
+    Transcreve um arquivo de áudio.
+    Ordem de tentativa:
+      1. API local faster-whisper (se WHISPER_API_ENABLED=true)
+      2. OpenAI Whisper (se OPENAI_API_KEY configurada)
+      3. Groq Whisper (fallback)
     """
     logger.info(f"[TRANSCRIBE_AUDIO] Iniciando transcrição para o arquivo: {audio_path}")
 
@@ -137,13 +192,21 @@ async def transcribe_audio(audio_path: str) -> str:
     file_size = audio_file_path.stat().st_size
     logger.info(f"[TRANSCRIBE_AUDIO] Arquivo: '{audio_file_path.name}' (Tamanho: {file_size} bytes)")
 
-    # Verificar se OpenAI está configurada
+    # Verificar configuração dos provedores
+    use_local = bool(getattr(settings, "WHISPER_API_ENABLED", False)) and bool(getattr(settings, "WHISPER_API_BASE_URL", None))
     use_openai = bool(settings.OPENAI_API_KEY)
     use_groq_fallback = bool(settings.GROQ_API_KEY)
 
-    if not use_openai and not use_groq_fallback:
-        logger.error("[TRANSCRIBE_AUDIO] Nenhuma API de transcrição configurada (OpenAI ou Groq).")
+    if not use_local and not use_openai and not use_groq_fallback:
+        logger.error("[TRANSCRIBE_AUDIO] Nenhuma API de transcrição configurada (local, OpenAI ou Groq).")
         return "[Erro Transcrição: Nenhuma API configurada]"
+
+    # 1. Tentar API local primeiro (gratuita, baixa latência)
+    if use_local:
+        local_result = await _transcribe_with_local_whisper(audio_file_path)
+        if local_result:
+            return local_result
+        logger.warning("[TRANSCRIBE_AUDIO] API local falhou/vazia, tentando fallback OpenAI/Groq...")
 
     # Tentar OpenAI primeiro (se configurada)
     if use_openai:

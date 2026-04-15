@@ -33,3 +33,11 @@ mysql_data/
 # Deploy scripts com dados sensíveis
 deploy-server.sh
 setup-ols-proxy.sh
+docker-compose.production.yml
+
+# Backups e diretorios excluidos
+*.bak
+*.bak-*
+media/
+uploads/
+backups/
