@@ -1478,19 +1478,18 @@ async function loadRecentConvs() {
     }
 
     container.innerHTML = items.map(p => {
-      const name    = p.name || p.phone_number || p.jid || 'Desconhecido';
+      const name    = p.name || p.jid || 'Desconhecido';
       const initials = name.charAt(0).toUpperCase();
-      const preview = p.last_message || 'Sem mensagem';
-      const time    = p.last_interaction ? new Date(p.last_interaction).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-      const unread  = p.unread_count > 0 ? `<span class="conv-unread">${p.unread_count}</span>` : '';
+      const preview = 'Clique para ver histórico';
+      const time    = p.last_interaction_at ? new Date(p.last_interaction_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
       return `
-        <div class="conv-item" onclick="openConvHistory('${p.jid || p.id || p.phone_number}', '${name.replace(/'/g,"\\'")}')">
+        <div class="conv-item" onclick="openConvHistory('${p.jid}', '${name.replace(/'/g,"\\'")}')">
           <div class="conv-avatar">${initials}</div>
           <div class="conv-info">
             <div class="conv-name">${name}</div>
-            <div class="conv-preview">${preview.substring(0, 60)}</div>
+            <div class="conv-preview">${preview}</div>
           </div>
-          <div class="conv-meta">${time}${unread}</div>
+          <div class="conv-meta">${time}</div>
         </div>`;
     }).join('');
     console.log(`[Dashboard] ${items.length} conversas renderizadas`);
@@ -2164,9 +2163,9 @@ function filterConversas() {
   const search = document.getElementById('conv-search')?.value.toLowerCase() || '';
   const filter = document.getElementById('conv-filter')?.value || '';
   const filtered = allConversas.filter(p => {
-    const name  = (p.name || p.phone_number || '').toLowerCase();
+    const name  = (p.name || p.jid || '').toLowerCase();
     const matchSearch = !search || name.includes(search);
-    const matchFilter = !filter || p.status === filter || p.stage === filter;
+    const matchFilter = !filter || p.status === filter;
     return matchSearch && matchFilter;
   });
   renderConvList(filtered);
@@ -2187,31 +2186,69 @@ function renderConvList(items) {
   }
 
   container.innerHTML = items.map(p => {
-    const name     = p.name || p.phone_number || p.jid || 'Desconhecido';
+    const name     = p.name || p.jid || 'Desconhecido';
     const initials = name.charAt(0).toUpperCase();
-    const preview  = p.last_message || 'Sem mensagem recente';
-    const time     = p.last_interaction
-      ? new Date(p.last_interaction).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    const preview  = 'Clique para ver histórico';
+    const time     = p.last_interaction_at
+      ? new Date(p.last_interaction_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       : '–';
     const statusBadge = p.status === 'converted'
       ? '<span class="badge badge-success">Convertido</span>'
       : p.status === 'lost'
         ? '<span class="badge badge-error">Perdido</span>'
         : '<span class="badge badge-muted">Ativo</span>';
+    const pausedBadge = p.llm_paused
+      ? '<span class="badge" style="background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:10px;">IA pausada</span>'
+      : '';
+    const pauseBtn = p.llm_paused
+      ? `<button class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(208,255,89,0.1);border:1px solid rgba(208,255,89,0.3);color:var(--cta);border-radius:8px;" onclick="event.stopPropagation();toggleLLMPause('${p.jid}', false, this)">▶ Retomar IA</button>`
+      : `<button class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);color:#ffaa00;border-radius:8px;" onclick="event.stopPropagation();toggleLLMPause('${p.jid}', true, this)">⏸ Pausar IA</button>`;
 
     return `
-      <div class="conv-item" onclick="openConvHistory('${p.jid || p.id || p.phone_number}', '${name.replace(/'/g,"\\'")}')">
+      <div class="conv-item" onclick="openConvHistory('${p.jid}', '${name.replace(/'/g,"\\'")}')">
         <div class="conv-avatar">${initials}</div>
         <div class="conv-info">
-          <div class="conv-name" style="display:flex;align-items:center;gap:8px;">${name} ${statusBadge}</div>
-          <div class="conv-preview">${preview.substring(0, 80)}</div>
+          <div class="conv-name" style="display:flex;align-items:center;gap:8px;">${name} ${statusBadge} ${pausedBadge}</div>
+          <div class="conv-preview">${preview}</div>
         </div>
-        <div class="conv-meta" style="text-align:right;min-width:80px;">
+        <div class="conv-meta" style="text-align:right;min-width:110px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <div style="font-size:11px;color:var(--muted);">${time}</div>
-          ${p.message_count ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${p.message_count} msgs</div>` : ''}
+          ${pauseBtn}
         </div>
       </div>`;
   }).join('');
+}
+
+async function toggleLLMPause(jid, pause, btn) {
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '...';
+  try {
+    await apiRequest('POST', `/prospects/${jid}/toggle-llm-pause`, { llm_paused: pause });
+    if (pause) {
+      btn.innerHTML = '▶ Retomar IA';
+      btn.style.background = 'rgba(208,255,89,0.1)';
+      btn.style.borderColor = 'rgba(208,255,89,0.3)';
+      btn.style.color = 'var(--cta)';
+      btn.onclick = (e) => { e.stopPropagation(); toggleLLMPause(jid, false, btn); };
+      const nameEl = btn.closest('.conv-item')?.querySelector('.conv-name');
+      if (nameEl && !nameEl.querySelector('.paused-tag')) {
+        nameEl.insertAdjacentHTML('beforeend', '<span class="paused-tag badge" style="background:rgba(255,170,0,0.15);color:#ffaa00;border:1px solid rgba(255,170,0,0.3);font-size:10px;">IA pausada</span>');
+      }
+    } else {
+      btn.innerHTML = '⏸ Pausar IA';
+      btn.style.background = 'rgba(255,170,0,0.1)';
+      btn.style.borderColor = 'rgba(255,170,0,0.3)';
+      btn.style.color = '#ffaa00';
+      btn.onclick = (e) => { e.stopPropagation(); toggleLLMPause(jid, true, btn); };
+      btn.closest('.conv-item')?.querySelector('.paused-tag')?.remove();
+    }
+  } catch (err) {
+    btn.innerHTML = original;
+    alert('Erro ao alterar pausa da IA: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function openConvHistory(jid, name) {
@@ -2237,7 +2274,7 @@ async function openConvHistory(jid, name) {
     document.getElementById('conv-modal-body').innerHTML = `
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${messages.map(msg => {
-          const isAgent = msg.sender === 'agent' || msg.sender === 'bot' || msg.from_bot;
+          const isAgent = msg.role === 'assistant';
           const time = msg.timestamp ? new Date(msg.timestamp).toLocaleString('pt-BR') : '';
           return `
             <div style="display:flex;flex-direction:column;align-items:${isAgent ? 'flex-end' : 'flex-start'};">
